@@ -2,7 +2,7 @@
 
 ## v0.6 (2026-06-20)
 - **重大架構升級** — 從純前端 SPA 升級為 Python 後端架構 (FastAPI + SQLite + ntplib)
-- **真實 NTP 校時** — 伺服器端 ntplib 連接香港天文台 time.hko.hk，精度 ±5ms
+- **真實 NTP 校時** — 伺服器端 ntplib 連接香港天文台 stdtime.gov.hk，精度 ±5ms
 - **資料持久化** — SQLite 資料庫取代 localStorage，跨 session 不遺失
 - **多機共享** — 區域網內多個操作員可同時操作同一個排程資料庫
 - **自動備份** — 每次啟動自動產生日期備份檔

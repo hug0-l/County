@@ -69,7 +69,7 @@ const NTPManager = {
     lastSyncTime: null,     // ISO string
     errorMsg: '',
     config: {
-        ntpServerUrl: 'time.hko.hk',
+        ntpServerUrl: 'stdtime.gov.hk',
         ntpAutoSyncInterval: 600,   // seconds
     },
     timerId: null,
@@ -82,14 +82,14 @@ const NTPManager = {
 # server.py — NTPManager class
 import ntplib
 client = ntplib.NTPClient()
-response = client.request('time.hko.hk', version=3, timeout=5)
+response = client.request('stdtime.gov.hk', version=3, timeout=5)
 offset_ms = response.offset * 1000  # seconds → ms
 ```
 
 | 端點 | 方法 | 說明 |
 |------|------|------|
 | `/api/ntp/status` | GET | 回傳目前 NTP 狀態與偏移量 |
-| `/api/ntp/sync` | POST | 觸發即時 NTP 同步（ntplib → time.hko.hk） |
+| `/api/ntp/sync` | POST | 觸發即時 NTP 同步（ntplib → stdtime.gov.hk） |
 
 ### 關鍵前端函數
 | 函數 | 說明 |
@@ -108,7 +108,7 @@ offset_ms = response.offset * 1000  # seconds → ms
 ## ⚠️ 關鍵注意事項（Gotchas）
 
 1. **後端優先** — 啟動前先 `python server.py`，前端 SPA 由 FastAPI 提供服務。直接用瀏覽器開啟 `templates/index.html` 會缺少 API 支援。
-2. **NTP 使用 UDP port 123** — `ntplib` 透過 UDP 連接 `time.hko.hk`。若防火牆阻擋 UDP 123，NTP 會降級至本地時鐘。
+2. **NTP 使用 UDP port 123** — `ntplib` 透過 UDP 連接 `stdtime.gov.hk`。若防火牆阻擋 UDP 123，NTP 會降級至本地時鐘。
 3. **timeOffset 全局變數** — `let timeOffset = 0`。`getCalibratedDate()` 使用 `Date.now() + timeOffset` 做時間校正。
 4. **SQLite 資料庫 (`vcc_pre.db`)** — 所有資料持久化在 SQLite。若資料庫損毀，可刪除後重啟伺服器（會重新建立空資料庫）。
 5. **重要 localStorage key**：

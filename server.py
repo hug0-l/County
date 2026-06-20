@@ -244,7 +244,7 @@ class NTPManager:
         self.status = 'local'  # 'connected' | 'fallback' | 'local' | 'syncing' | 'error'
         self.offset_ms = 0.0
         self.last_sync_time = None
-        self.server_url = 'time.hko.hk'
+        self.server_url = 'stdtime.gov.hk'
         self.error_msg = ''
 
     def sync(self) -> dict:
@@ -414,7 +414,7 @@ def get_config():
         'beepFreq': '1500',
         'beepDur': '0.5',
         'retentionSeconds': '5',
-        'ntpServerUrl': 'time.hko.hk',
+        'ntpServerUrl': 'stdtime.gov.hk',
         'ntpAutoSyncInterval': '600',
         'ntpLastOffset': '0',
         'ntpLastSyncTime': '',

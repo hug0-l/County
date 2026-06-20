@@ -16,7 +16,7 @@ python server.py
 瀏覽器自動開啟 `http://localhost:8000`，您的主控台就在這裡！
 
 ## 🆕 v0.6 新功能
-- **真實 NTP 校時** — 使用 ntplib 連接香港天文台 time.hko.hk，精度 ±5ms
+- **真實 NTP 校時** — 使用 ntplib 連接香港天文台 stdtime.gov.hk，精度 ±5ms
 - **Python 後端** — FastAPI + SQLite，資料不再受瀏覽器限制
 - **自動備份** — 每次啟動自動備份資料庫
 - **開罐即用** — 一條指令啟動完整系統
@@ -508,7 +508,7 @@ v0.6 開始使用 **SQLite** 作為主要資料儲存，所有排程、Preset、
 | 提示音頻率 | Number | 測試音的頻率 |
 | 提示音長度 | Number | 測試音的持續時間 |
 | 行事曆記憶天數 | Number | 日曆可視範圍 |
-| NTP 伺服器 | Input | NTP 伺服器位址（預設 `time.hko.hk`） |
+| NTP 伺服器 | Input | NTP 伺服器位址（預設 `stdtime.gov.hk`） |
 | NTP 同步間隔 | Number | 自動同步間隔（秒，0=關閉） |
 | 引擎心跳間隔 | Input | 開發者選項：定時器間隔 (ms) |
 
@@ -548,7 +548,7 @@ v0.6 開始使用 **SQLite** 作為主要資料儲存，所有排程、Preset、
 ## 11. NTP 時間服務（v0.6 新增）
 
 ### 11.1 概述
-VCC PRE v0.6 新增 **真實 NTP 校時** 功能，使用 Python `ntplib` 透過 UDP port 123 連接香港天文台 `time.hko.hk`，精度可達 ±5ms。
+VCC PRE v0.6 新增 **真實 NTP 校時** 功能，使用 Python `ntplib` 透過 UDP port 123 連接香港天文台 `stdtime.gov.hk`，精度可達 ±5ms。
 
 ### 11.2 架構
 
@@ -561,7 +561,7 @@ VCC PRE v0.6 新增 **真實 NTP 校時** 功能，使用 Python `ntplib` 透過
                                                  │
                                                  ▼
                                           ┌──────────────┐
-                                          │  time.hko.hk  │
+                                          │  stdtime.gov.hk  │
                                           │ (香港天文台)   │
                                           └──────────────┘
 ```
@@ -575,7 +575,7 @@ const NTPManager = {
     lastSyncTime: null,     // ISO string
     errorMsg: '',
     config: {
-        ntpServerUrl: 'time.hko.hk',
+        ntpServerUrl: 'stdtime.gov.hk',
         ntpAutoSyncInterval: 600,   // seconds
     },
     timerId: null,          // auto-sync setInterval ID
@@ -594,7 +594,7 @@ class NTPManager:
     def __init__(self):
         self.status = 'local'
         self.offset_ms = 0.0
-        self.server_url = 'time.hko.hk'
+        self.server_url = 'stdtime.gov.hk'
 
     def sync(self) -> dict:
         """使用 ntplib 透過 UDP 123 進行真實 NTP 同步"""
@@ -614,7 +614,7 @@ class NTPManager:
 
 | 設定項 | ID | 類型 | 說明 |
 |-------|-----|------|------|
-| NTP 伺服器 | `cfgNtpUrl` | Input | NTP 伺服器位址（預設 `time.hko.hk`） |
+| NTP 伺服器 | `cfgNtpUrl` | Input | NTP 伺服器位址（預設 `stdtime.gov.hk`） |
 | 自動同步間隔 | `cfgNtpInterval` | Number | 秒數（0=關閉，預設 600） |
 | 狀態 | `settingsNtpStatus` | Display | 🟢 已同步 / ⚠️ 降級 / 🔴 錯誤 |
 | 立即同步 | `btnNtpSync` | Button | 手動觸發同步 |
@@ -626,7 +626,7 @@ class NTPManager:
 
 ### 11.7 已知限制
 - ⚠️ **UDP port 123 必須開放** — NTP 同步使用 UDP 協定，若防火牆阻擋則無法同步
-- ⚠️ **`time.hko.hk` 為香港天文台 NTP 伺服器** — 若在非香港區域或該伺服器不可用，系統自動降級至本地時鐘
+- ⚠️ **`stdtime.gov.hk` 為香港天文台 NTP 伺服器** — 若在非香港區域或該伺服器不可用，系統自動降級至本地時鐘
 - ⚠️ **偏移量精度受網路延遲影響** — 一般情況下 ntplib 可達 ±5ms 精度
 - ⚠️ **後端離線時** — 前端自動降級至 localStorage 的上次成功偏移量
 
