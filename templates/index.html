@@ -712,9 +712,9 @@ setTimeout(function() {
                     <!-- Connection Bar -->
                     <div class="clipper-connect-bar">
                         <span>🌐</span>
-                        <input type="text" id="clipperServerUrl" value="ws://localhost:8765" style="width:180px;">
+                        <input type="text" id="clipperServerUrl" placeholder="ws://localhost:8765" style="width:180px;">
                         <span>🔑</span>
-                        <input type="text" id="clipperRoomCode" value="1234" style="width:70px;">
+                        <input type="text" id="clipperRoomCode" placeholder="1234" style="width:70px;">
                         <button class="btn-ctrl btn-export-ui" onclick="handleClipperConnect()">🔗 連線</button>
                         <span style="flex:1;"></span>
                         <span id="clipperFileStatus" style="font-size:10px;color:#64748b;">就緒</span>
@@ -2033,11 +2033,21 @@ setTimeout(function() {
         const savedClipperName = localStorage.getItem('vcc_clipper_name') || 'VPRE';
         const clipperDisplayNameEl = document.getElementById('clipperDisplayName');
         if (clipperDisplayNameEl) clipperDisplayNameEl.textContent = savedClipperName;
-        // Restore persisted Clipper URL and room
+        // Restore persisted Clipper URL and room (default follows browser hostname)
+        var clipperUrlInput = document.getElementById('clipperServerUrl');
+        var clipperRoomInput = document.getElementById('clipperRoomCode');
+        var defaultClipperUrl = 'ws://' + location.hostname + ':8765';
         var savedClipperUrl = localStorage.getItem('county_clipper_url');
         var savedClipperRoom = localStorage.getItem('county_clipper_room');
-        if (savedClipperUrl) document.getElementById('clipperServerUrl').value = savedClipperUrl;
-        if (savedClipperRoom) document.getElementById('clipperRoomCode').value = savedClipperRoom;
+        clipperUrlInput.value = savedClipperUrl || defaultClipperUrl;
+        clipperRoomInput.value = savedClipperRoom || '1234';
+        // Auto-save Clipper settings on input change
+        clipperUrlInput.addEventListener('input', function() {
+            try { localStorage.setItem('county_clipper_url', this.value); } catch(e) {}
+        });
+        clipperRoomInput.addEventListener('input', function() {
+            try { localStorage.setItem('county_clipper_room', this.value); } catch(e) {}
+        });
 
         // 先從 API 載入資料，失敗則從 localStorage 降級
         loadFromServer().then(function() {
@@ -4401,8 +4411,9 @@ setTimeout(function() {
 
     // Initialize Clipper modules
     function initClipperModules() {
+        var url = document.getElementById('clipperServerUrl').value.trim() || 'ws://' + location.hostname + ':8765';
         var bus = new MessageBus();
-        var wsManager = new WSManager('ws://localhost:8765', bus);
+        var wsManager = new WSManager(url, bus);
         wsManager.enableAutoReconnect();
 
         var chatModule = new ChatModule(bus, wsManager, {
@@ -4536,7 +4547,7 @@ setTimeout(function() {
         window.clipperModules = { bus: bus, ws: wsManager, chat: chatModule, files: filesModule };
 
         // ⚡ Auto-connect on page load (no click needed)
-        var url = document.getElementById('clipperServerUrl').value.trim() || 'ws://localhost:8765';
+        var url = document.getElementById('clipperServerUrl').value.trim() || 'ws://' + location.hostname + ':8765';
         wsManager._url = url;
         // Auto connect if we have a persisted URL (user has connected before)
         if (localStorage.getItem('county_clipper_url')) {
@@ -4613,7 +4624,7 @@ setTimeout(function() {
 
     // Handle connect button click
     function handleClipperConnect() {
-        var url = document.getElementById('clipperServerUrl').value.trim() || 'ws://localhost:8765';
+        var url = document.getElementById('clipperServerUrl').value.trim() || 'ws://' + location.hostname + ':8765';
         var room = document.getElementById('clipperRoomCode').value.trim() || '1234';
         try { localStorage.setItem('county_clipper_url', url); localStorage.setItem('county_clipper_room', room); } catch(e) {}
         var connectBtns = document.querySelectorAll('[onclick*="handleClipperConnect"]');
