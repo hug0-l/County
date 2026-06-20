@@ -326,6 +326,23 @@
         .clipper-badge { display:none; margin-left:auto; background:#ef4444; color:#fff; font-size:9px; font-weight:bold; padding:1px 5px; border-radius:8px; line-height:1.4; }
         .clipper-badge.show { display:inline-block; }
 
+        /* Clipper IM 進度條與按鈕樣式 */
+        .clipper-progress-item { background:#1e293b; border-radius:6px; padding:8px 10px; margin-bottom:6px; font-size:12px; }
+        .clipper-progress-header { display:flex; justify-content:space-between; color:#cbd5e1; margin-bottom:4px; }
+        .clipper-progress-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px; }
+        .clipper-progress-size { color:#64748b; font-size:11px; }
+        .clipper-progress-bar { height:4px; background:#334155; border-radius:2px; overflow:hidden; margin:4px 0; }
+        .clipper-progress-fill { height:100%; background:#38bdf8; border-radius:2px; transition:width 0.3s ease; }
+        .clipper-progress-fill.done { background:#22c55e; }
+        .clipper-progress-fill.error { background:#ef4444; }
+        .clipper-progress-fill.receiving { background:#a855f7; }
+        .clipper-progress-status { font-size:10px; color:#64748b; }
+        .clipper-peer-btn { padding:4px 10px; font-size:11px; background:#1e293b; border:1px solid #334155; color:#e2e8f0; border-radius:4px; cursor:pointer; transition:all 0.15s; }
+        .clipper-peer-btn:hover { border-color:#38bdf8; }
+        .clipper-peer-btn.selected { background:#1e3a5f; border-color:#38bdf8; color:#38bdf8; }
+        .clipper-peer-btn.all-btn { border-color:#64748b; }
+        .clipper-peer-btn.all-btn.selected { background:#1e3a5f; border-color:#38bdf8; }
+
         /* 操作說明頁面 */
         .help-section { background:#111827; border:1px solid #1f2937; border-radius:8px; padding:18px 22px; margin-bottom:16px; }
         .help-section h2 { color:#38bdf8; font-size:16px; margin:0 0 12px 0; letter-spacing:0.5px; }
