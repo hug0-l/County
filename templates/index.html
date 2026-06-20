@@ -829,7 +829,13 @@
                 </div>
 
                 <div class="panel-box" style="margin-top: 5px;">
-                    <div class="panel-header-box"><div class="panel-title">系統日誌 (Console)</div></div>
+                    <div class="panel-header-box">
+                        <div class="panel-title">系統日誌 (Console)</div>
+                        <div style="display:flex; gap:4px;">
+                            <button class="btn-ctrl btn-export-ui" onclick="exportClientLog()" style="padding:2px 8px; font-size:10px;">📋 匯出日誌</button>
+                            <button class="btn-ctrl btn-import-ui" onclick="document.getElementById('consoleTerminal').innerHTML='';" style="padding:2px 8px; font-size:10px;">🗑 清除</button>
+                        </div>
+                    </div>
                     <div class="console-terminal" id="consoleTerminal"></div>
                 </div>
             </div>
@@ -1627,18 +1633,91 @@
         });
     }
 
+    // ===== Client-side persistent logging (24h retention) =====
+    const CLIENT_LOG_KEY = 'vcc_client_logs';
+    const CLIENT_LOG_MAX = 1000;   // max lines in buffer
+    const CLIENT_LOG_TRIM = 500;   // trim to this many when full
+
     function writeLog(message, type = 'info') {
+        // --- In-memory console display ---
         const consoleEl = document.getElementById('consoleTerminal');
-        if (!consoleEl) return;
         const now = new Date();
         const timeStr = now.toTimeString().split(' ')[0] + "." + String(now.getMilliseconds()).padStart(3, '0');
-        let line = document.createElement('div');
-        line.className = "console-line";
-        if (type === 'error') line.style.color = "#ef4444";
-        if (type === 'warn') line.style.color = "#f59e0b";
-        line.innerHTML = '<span class="console-time">[' + timeStr + ']</span>' + message;
-        consoleEl.appendChild(line);
-        consoleEl.scrollTop = consoleEl.scrollHeight;
+        
+        if (consoleEl) {
+            let line = document.createElement('div');
+            line.className = "console-line";
+            if (type === 'error') line.style.color = "#ef4444";
+            if (type === 'warn') line.style.color = "#f59e0b";
+            line.innerHTML = '<span class="console-time">[' + timeStr + ']</span>' + message;
+            consoleEl.appendChild(line);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        // Also output to browser console for developer tools
+        if (type === 'error') console.error('[VCC]', message);
+        else if (type === 'warn') console.warn('[VCC]', message);
+        else console.log('[VCC]', message);
+
+        // --- Persistent log buffer (localStorage, auto-prune 24h) ---
+        persistClientLog(now.toISOString(), type, message);
+    }
+
+    function persistClientLog(isoTimestamp, type, message) {
+        try {
+            let logs = [];
+            const raw = localStorage.getItem(CLIENT_LOG_KEY);
+            if (raw) {
+                try { logs = JSON.parse(raw); } catch(e) { logs = []; }
+            }
+            
+            // Prune entries older than 24 hours
+            const cutoff = Date.now() - 86400000;  // 24h in ms
+            logs = logs.filter(function(entry) {
+                return new Date(entry.t).getTime() > cutoff;
+            });
+            
+            // Add new entry
+            logs.push({ t: isoTimestamp, l: type, m: message });
+            
+            // Trim if over max
+            if (logs.length > CLIENT_LOG_MAX) {
+                logs = logs.slice(logs.length - CLIENT_LOG_TRIM);
+            }
+            
+            localStorage.setItem(CLIENT_LOG_KEY, JSON.stringify(logs));
+        } catch(e) {
+            // localStorage full or unavailable — silently ignore
+            if (consoleEl) consoleEl.innerHTML += '<div class="console-line" style="color:#ef4444;">⚠️ 日誌緩衝區寫入失敗</div>';
+        }
+    }
+
+    function exportClientLog() {
+        try {
+            const raw = localStorage.getItem(CLIENT_LOG_KEY);
+            if (!raw) { alert('尚無日誌記錄'); return; }
+            const logs = JSON.parse(raw);
+            let text = '# VCC PRE Client Log — ' + new Date().toISOString().split('T')[0] + '\n';
+            text += '# Lines: ' + logs.length + '\n';
+            text += '# Generated: ' + new Date().toISOString() + '\n';
+            text += '# ========================================\n\n';
+            logs.forEach(function(entry) {
+                const level = ({info:'INFO',warn:'WARN',error:'ERROR',success:'INFO'})[entry.l] || entry.l.toUpperCase();
+                text += '[' + entry.t + '] [' + level + '] ' + entry.m + '\n';
+            });
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'vcc_pre_client_log_' + new Date().toISOString().split('T')[0] + '.log';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            writeLog('📋 客戶端日誌已匯出 (' + logs.length + ' 行)', 'success');
+        } catch(e) {
+            alert('匯出失敗: ' + e.message);
+        }
     }
 
     function switchPage(pageId) {

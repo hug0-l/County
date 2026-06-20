@@ -2,6 +2,7 @@
 """
 VCC PRE CountdownCtrl — Backend Server
 FastAPI + SQLite + ntplib NTP syncing
+import sys
 Single-file server. python server.py to start.
 """
 
@@ -11,16 +12,63 @@ import sqlite3
 import threading
 import time
 import webbrowser
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, UploadFile
+from fastapi import FastAPI, UploadFile, Query
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+
+LOGS_DIR = Path(__file__).parent / "logs"
+LOGS_DIR.mkdir(exist_ok=True)
+
+# Current server log file path (one log per day for 24h retention)
+def _current_log_path() -> Path:
+    return LOGS_DIR / f"vcc_pre_{date.today().isoformat()}.log"
+
+
+
+def _append_log(level: str, msg: str):
+    """Append a log line to the daily log file + print to stderr."""
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"{ts} [{level:<7}] {msg}"
+    print(line, file=sys.stderr)  # stderr = visible in process output
+    log_path = _current_log_path()
+    try:
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass  # non-critical
+
+
+# Convenience helpers
+def log_info(msg: str):    _append_log("INFO", msg)
+def log_warn(msg: str):    _append_log("WARN", msg)
+def log_error(msg: str):   _append_log("ERROR", msg)
+
+
+# Clean up log files older than 24 hours
+def _clean_old_logs():
+    now = time.time()
+    cutoff = now - 86400
+    for f in LOGS_DIR.iterdir():
+        if f.name.startswith("vcc_pre_") and f.suffix == ".log" and f.stat().st_mtime < cutoff:
+            try:
+                f.unlink()
+                print(f"🧹 Removed old log: {f.name}")
+            except Exception:
+                pass
+
+
+_clean_old_logs()
 
 # ---------------------------------------------------------------------------
 # Database
@@ -633,11 +681,45 @@ async def import_legacy(data: LegacyImport):
 
 
 # ---------------------------------------------------------------------------
+# Log API
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/log/recent")
+async def get_recent_logs(lines: int = Query(100, ge=1, le=500)):
+    """Return the last N lines from the server log file."""
+    log_file = _current_log_path()
+    if not log_file.exists():
+        return PlainTextResponse("", media_type="text/plain")
+    try:
+        with open(log_file, "r", encoding="utf-8") as f:
+            all_lines = f.readlines()
+        recent = all_lines[-lines:]
+        return PlainTextResponse("".join(recent), media_type="text/plain")
+    except Exception as e:
+        log_error(f"Failed to read log file: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.get("/api/log/file")
+async def download_log_file():
+    """Download the current server log file."""
+    log_file = _current_log_path()
+    if not log_file.exists():
+        return PlainTextResponse("", media_type="text/plain")
+    return FileResponse(
+        str(log_file),
+        media_type="text/plain",
+        filename="vcc_pre_server.log"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    print(f"Server running at http://localhost:8000")
+    log_info(f"🚀 Server running at http://localhost:8000")
     init_db()
     threading.Timer(1.5, lambda: webbrowser.open('http://localhost:8000')).start()
     uvicorn.run(app, host='0.0.0.0', port=8000)
