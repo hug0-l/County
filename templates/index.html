@@ -4121,8 +4121,6 @@
         
         clipper.on('error', function(err) {
             appendClipperMsg('system', '❌ ' + (err.message || '未知錯誤'));
-        });        clipper.on('error', function(err) {
-            appendClipperMsg('system', '❌ ' + (err.message || '未知錯誤'));
         });
 
         // ---- 檔案傳輸事件監聽 ----
@@ -4175,9 +4173,10 @@
         clipper.on('file-error', function(err) {
             appendClipperMsg('system', '❌ ' + (err.message || '檔案傳輸錯誤'));
         });
-    }
 
-    function clipperSendMsg() {    }
+        // 🔥 開始連線！
+        clipper.connect();
+    }
 
     function clipperSendMsg() {
         const input = document.getElementById('clipperInput');
