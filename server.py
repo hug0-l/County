@@ -5,15 +5,18 @@ FastAPI + SQLite + ntplib NTP syncing
 Single-file server. python server.py to start.
 """
 
+import json
 import os
-import sys
 import sqlite3
 import threading
+import time
 import webbrowser
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -72,6 +75,120 @@ def init_db():
     """)
     conn.commit()
     conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Database Helpers
+# ---------------------------------------------------------------------------
+
+
+def generate_id(prefix='P_'):
+    return f"{prefix}{int(time.time() * 1000)}"
+
+
+def db_get_schedules() -> list:
+    """Return all schedules as list of dicts."""
+    conn = get_db()
+    rows = conn.execute('SELECT * FROM schedules ORDER BY broadcast_date, start_time').fetchall()
+    result = []
+    for row in rows:
+        d = dict(row)
+        d['tags'] = json.loads(d.get('tags', '[]'))
+        d['periodicDays'] = json.loads(d.get('periodic_days', '[]'))
+        result.append(d)
+    conn.close()
+    return result
+
+
+def db_get_schedule(id: str) -> dict | None:
+    conn = get_db()
+    row = conn.execute('SELECT * FROM schedules WHERE id=?', (id,)).fetchone()
+    conn.close()
+    if row:
+        d = dict(row)
+        d['tags'] = json.loads(d.get('tags', '[]'))
+        d['periodicDays'] = json.loads(d.get('periodic_days', '[]'))
+        return d
+    return None
+
+
+def db_upsert_schedule(data: dict) -> dict:
+    conn = get_db()
+    tags_json = json.dumps(data.get('tags', []), ensure_ascii=False)
+    days_json = json.dumps(data.get('periodicDays', []))
+    conn.execute('''INSERT OR REPLACE INTO schedules 
+        (id, name, broadcast_date, start_time, duration, periodic_type, 
+         periodic_end_date, periodic_days, preset_id, tags, color_label)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
+        (data['id'], data['name'], data.get('broadcastDate', ''),
+         data.get('startTime', ''), data.get('duration', ''),
+         data.get('periodicType', 'none'), data.get('periodicEndDate', ''),
+         days_json, data.get('presetId', 'std_news'),
+         tags_json, data.get('colorLabel', '')))
+    conn.commit()
+    conn.close()
+    return db_get_schedule(data['id'])
+
+
+def db_delete_schedule(id: str) -> bool:
+    conn = get_db()
+    conn.execute('DELETE FROM schedules WHERE id=?', (id,))
+    affected = conn.total_changes
+    conn.commit()
+    conn.close()
+    return affected > 0
+
+
+def db_get_presets() -> list:
+    conn = get_db()
+    rows = conn.execute('SELECT * FROM presets').fetchall()
+    result = [dict(r) for r in rows]
+    for r in result:
+        r['nodes'] = json.loads(r.pop('nodes_json', '[]'))
+    conn.close()
+    return result
+
+
+def db_get_preset(id: str) -> dict | None:
+    conn = get_db()
+    row = conn.execute('SELECT * FROM presets WHERE id=?', (id,)).fetchone()
+    conn.close()
+    if row:
+        d = dict(row)
+        d['nodes'] = json.loads(d.pop('nodes_json', '[]'))
+        return d
+    return None
+
+
+def db_upsert_preset(data: dict) -> dict:
+    conn = get_db()
+    nodes_json = json.dumps(data.get('nodes', []), ensure_ascii=False)
+    conn.execute('''INSERT OR REPLACE INTO presets (id, name, nodes_json)
+        VALUES (?,?,?)''', (data['id'], data['name'], nodes_json))
+    conn.commit()
+    conn.close()
+    return db_get_preset(data['id'])
+
+
+def db_delete_preset(id: str) -> bool:
+    conn = get_db()
+    conn.execute('DELETE FROM presets WHERE id=?', (id,))
+    affected = conn.total_changes
+    conn.commit()
+    conn.close()
+    return affected > 0
+
+
+def db_import_legacy(schedules: list, presets: dict):
+    """Import from legacy localStorage dump."""
+    for pid, pdata in presets.items():
+        db_upsert_preset({
+            'id': pid,
+            'name': pdata.get('name', ''),
+            'nodes': pdata.get('nodes', [])
+        })
+    for s in schedules:
+        db_upsert_schedule(s)
 
 
 # ---------------------------------------------------------------------------
@@ -162,6 +279,31 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
 # ---------------------------------------------------------------------------
+# Pydantic Models
+# ---------------------------------------------------------------------------
+
+
+class ScheduleCreate(BaseModel):
+    id: Optional[str] = None
+    name: str
+    broadcastDate: str
+    startTime: str
+    duration: str
+    periodicType: str = 'none'
+    periodicEndDate: str = ''
+    periodicDays: list = []
+    presetId: str = 'std_news'
+    tags: list = []
+    colorLabel: str = ''
+
+
+class PresetCreate(BaseModel):
+    id: Optional[str] = None
+    name: str
+    nodes: list = []
+
+
+# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
@@ -192,6 +334,108 @@ async def ntp_sync():
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "db": str(DB_PATH.exists())}
+
+
+# ---------------------------------------------------------------------------
+# Schedule CRUD
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/schedule")
+async def list_schedules():
+    return db_get_schedules()
+
+
+@app.get("/api/schedule/{schedule_id}")
+async def get_schedule(schedule_id: str):
+    s = db_get_schedule(schedule_id)
+    if s is None:
+        return JSONResponse(status_code=404, content={"error": "not found"})
+    return s
+
+
+@app.post("/api/schedule")
+async def create_schedule(data: ScheduleCreate):
+    doc = data.model_dump()
+    if not doc.get('id'):
+        doc['id'] = generate_id('SCH_')
+    return db_upsert_schedule(doc)
+
+
+@app.put("/api/schedule/{schedule_id}")
+async def update_schedule(schedule_id: str, data: ScheduleCreate):
+    existing = db_get_schedule(schedule_id)
+    if existing is None:
+        return JSONResponse(status_code=404, content={"error": "not found"})
+    doc = data.model_dump()
+    doc['id'] = schedule_id
+    return db_upsert_schedule(doc)
+
+
+@app.delete("/api/schedule/{schedule_id}")
+async def delete_schedule(schedule_id: str):
+    if db_delete_schedule(schedule_id):
+        return {"deleted": True}
+    return JSONResponse(status_code=404, content={"error": "not found"})
+
+
+# ---------------------------------------------------------------------------
+# Preset CRUD
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/preset")
+async def list_presets():
+    return db_get_presets()
+
+
+@app.get("/api/preset/{preset_id}")
+async def get_preset(preset_id: str):
+    p = db_get_preset(preset_id)
+    if p is None:
+        return JSONResponse(status_code=404, content={"error": "not found"})
+    return p
+
+
+@app.post("/api/preset")
+async def create_preset(data: PresetCreate):
+    doc = data.model_dump()
+    if not doc.get('id'):
+        doc['id'] = generate_id('PRS_')
+    return db_upsert_preset(doc)
+
+
+@app.put("/api/preset/{preset_id}")
+async def update_preset(preset_id: str, data: PresetCreate):
+    existing = db_get_preset(preset_id)
+    if existing is None:
+        return JSONResponse(status_code=404, content={"error": "not found"})
+    doc = data.model_dump()
+    doc['id'] = preset_id
+    return db_upsert_preset(doc)
+
+
+@app.delete("/api/preset/{preset_id}")
+async def delete_preset(preset_id: str):
+    if db_delete_preset(preset_id):
+        return {"deleted": True}
+    return JSONResponse(status_code=404, content={"error": "not found"})
+
+
+# ---------------------------------------------------------------------------
+# Import Legacy
+# ---------------------------------------------------------------------------
+
+
+class LegacyImport(BaseModel):
+    schedules: list = []
+    presets: dict = {}
+
+
+@app.post("/api/import-legacy")
+async def import_legacy(data: LegacyImport):
+    db_import_legacy(data.schedules, data.presets)
+    return {"imported": True, "schedules": len(data.schedules), "presets": len(data.presets)}
 
 
 # ---------------------------------------------------------------------------
