@@ -326,6 +326,9 @@
 
         /* CUE Popup 動畫 */
         @keyframes cuePopIn { 0% { opacity:0; transform:translateX(-50%) translateY(-20px) scale(0.9); } 100% { opacity:1; transform:translateX(-50%) translateY(0) scale(1); } }
+        @keyframes slideUp { 0% { opacity:0; transform:translateY(20px); } 100% { opacity:1; transform:translateY(0); } }
+        .clipper-badge { display:none; margin-left:auto; background:#ef4444; color:#fff; font-size:9px; font-weight:bold; padding:1px 5px; border-radius:8px; line-height:1.4; }
+        .clipper-badge.show { display:inline-block; }
 
         /* 操作說明頁面 */
         .help-section { background:#111827; border:1px solid #1f2937; border-radius:8px; padding:18px 22px; margin-bottom:16px; }
@@ -527,7 +530,7 @@
                     <div class="menu-item" id="menu-rundown" onclick="switchPage('rundown')">📅 排程</div>
                     <div class="menu-item" id="menu-preset" onclick="switchPage('preset')">📋 Preset</div>
                     <div class="menu-item" id="menu-settings" onclick="switchPage('settings')">🛠️ 設定</div>
-                    <div class="menu-item" id="menu-clipper" onclick="switchPage('clipper')">💬 Clipper IM</div>
+                    <div class="menu-item" id="menu-clipper" onclick="switchPage('clipper')">💬 Clipper IM <span class="clipper-badge" id="clipperBadge">0</span></div>
                     <div class="menu-item" id="menu-changelog" onclick="switchPage('changelog')">📜 更新日誌</div>
                     <div class="menu-item" id="menu-help" onclick="switchPage('help')">📖 說明</div>
                 </div>
@@ -1969,6 +1972,10 @@
             if (!clipperConnected) {
                 setTimeout(clipperConnect, 500);
             }
+            // Clear unread badge
+            _clipperUnread = 0;
+            var badge = document.getElementById('clipperBadge');
+            if (badge) badge.className = 'clipper-badge';
         }
         if (pageId === 'settings') { refreshJsonInspectorProbe(); refreshConfigJsonArea(); fetchServerLog(); }
         // 跨頁面 CUE 引擎：全頁面運作，永遠監聽 CUE 觸發
@@ -4292,12 +4299,14 @@
             case 'chat':
                 // Chat message from another peer
                 appendClipperMsg('peer', data.text, data.from);
+                showClipperNotif(data.text, data.from);
                 break;
                 
             case 'chat-backup':
                 // Server-relayed chat message (from WS relay)
                 if (data.from && data.from !== document.getElementById('clipperDisplayName').textContent) {
                     appendClipperMsg('peer', data.text, data.from);
+                    showClipperNotif(data.text, data.from);
                 }
                 break;
                 
@@ -4400,6 +4409,32 @@
         
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
+    }
+
+    // ===== Clipper new-message toast (in-page popup, cross-page) =====
+    var _clipperUnread = 0;
+    function showClipperNotif(text, from) {
+        var clipperPage = document.getElementById('page-clipper');
+        if (clipperPage && clipperPage.classList.contains('active')) return;
+        // Update sidebar badge
+        _clipperUnread++;
+        var badge = document.getElementById('clipperBadge');
+        if (badge) { badge.textContent = _clipperUnread; badge.className = 'clipper-badge show'; }
+        // Show toast (replace any existing)
+        var old = document.getElementById('clipperToast');
+        if (old) old.remove();
+        var toast = document.createElement('div');
+        toast.id = 'clipperToast';
+        toast.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:10000;background:linear-gradient(135deg,#1a3a5c,#0f172a);border:1px solid #38bdf8;border-radius:10px;padding:12px 18px;max-width:340px;box-shadow:0 8px 32px rgba(56,189,248,0.25);cursor:pointer;animation:slideUp 0.25s ease-out;font-family:"Microsoft JhengHei",sans-serif';
+        var displayText = text.length > 80 ? text.substring(0, 80) + '...' : text;
+        toast.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-size:16px;">💬</span><span style="font-size:12px;color:#38bdf8;font-weight:bold;">' + escapeHtml(from || '对方') + '</span></div><div style="font-size:13px;color:#e2e8f0;line-height:1.4;word-break:break-word;">' + escapeHtml(displayText) + '</div><div style="font-size:10px;color:#64748b;margin-top:4px;">点击切换至 Clipper IM</div>';
+        toast.onclick = function() { toast.remove(); switchPage('clipper'); };
+        document.body.appendChild(toast);
+        setTimeout(function() {
+            var t = document.getElementById('clipperToast');
+            if (t) { t.style.transition = 'opacity 0.3s'; t.style.opacity = '0'; }
+            setTimeout(function() { if (t && t.parentNode) t.remove(); }, 350);
+        }, 5000);
     }
 
     function updateClipperStatus(state, label) {
