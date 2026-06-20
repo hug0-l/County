@@ -490,7 +490,11 @@ INDEX_HTML = BASE_DIR / "templates" / "index.html"
 
 @app.get("/")
 async def index():
-    return FileResponse(str(INDEX_HTML))
+    from fastapi.responses import Response
+    content = INDEX_HTML.read_bytes()
+    return Response(content=content, media_type="text/html",
+                    headers={"Cache-Control": "no-cache, no-store, must-revalidate",
+                             "Pragma": "no-cache", "Expires": "0"})
 
 
 @app.get("/api/ntp/status")
