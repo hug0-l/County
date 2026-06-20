@@ -689,6 +689,7 @@ def get_config():
         'lastSelectedDate': '',
         'clipper_name': 'VPRE',
         'app_version': '0.7',
+        'presetProtection': 'true',
     }
     for k, v in defaults.items():
         if k not in config:

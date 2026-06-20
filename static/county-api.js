@@ -151,6 +151,8 @@ County.register('API', function(C) {
                 appConfig.beepFreq = parseFloat(appConfig.beepFreq) || 1500;
                 appConfig.beepDur = parseFloat(appConfig.beepDur) || 0.5;
                 appConfig.retentionSeconds = parseInt(appConfig.retentionSeconds) || 5;
+                if (appConfig.presetProtection === 'true') appConfig.presetProtection = true;
+                if (appConfig.presetProtection === 'false') appConfig.presetProtection = false;
                 window.appConfig = appConfig;
                 try {
                     localStorage.setItem('county_config_v8', JSON.stringify(appConfig));

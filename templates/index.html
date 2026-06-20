@@ -499,6 +499,18 @@ setTimeout(function() {
                             </div>
                         </div>
                     </div>
+                    <div class="panel-box" style="margin-top:15px;">
+                        <div class="panel-header-box"><div class="panel-title">🔒 Preset 保護</div></div>
+                        <div class="input-form" style="grid-template-columns: 1fr;">
+                            <div class="input-group">
+                                <label style="display:flex; align-items:center; gap:8px;cursor:pointer;">
+                                    <input type="checkbox" id="cfgPresetProtection" onchange="saveConfig(); refreshPresetDropdownUI();" style="width:18px;height:18px;" checked>
+                                    <span>啟用內建 Preset 刪除保護</span>
+                                </label>
+                                <div style="font-size:11px; color:#64748b; margin-top:4px;">開啟時，內建 Preset（🔒）無法刪除；關閉後可自由刪除</div>
+                            </div>
+                        </div>
+                    </div>
                     <div>
                         <div class="panel-box">
                             <div class="panel-header-box"><div class="panel-title">⚙️ Config 檔</div></div>
@@ -1115,6 +1127,7 @@ setTimeout(function() {
             ntpAutoSyncInterval: 600,
             ntpLastOffset: 0,
             ntpLastSyncTime: '',
+            presetProtection: true,
             version: 3
         };
     }
@@ -1130,6 +1143,7 @@ setTimeout(function() {
         appConfig.beepDur = parseFloat(document.getElementById('cfgBeepDur').value) || 0.5;
         appConfig.timezone = document.getElementById('cfgTimezone').value;
         appConfig.retentionSeconds = parseInt(document.getElementById('cfgRetentionSec').value) || 5;
+        appConfig.presetProtection = document.getElementById('cfgPresetProtection').checked;
         appConfig.lastSelectedDate = document.getElementById('globalTargetDate').value;
         const ntpUrlInput = document.getElementById('cfgNtpUrl');
         const ntpIntervalInput = document.getElementById('cfgNtpInterval');
@@ -1167,6 +1181,8 @@ setTimeout(function() {
         if (tzEl && appConfig.timezone) tzEl.value = appConfig.timezone;
         const retEl = document.getElementById('cfgRetentionSec');
         if (retEl) retEl.value = appConfig.retentionSeconds || 5;
+        const pEl = document.getElementById('cfgPresetProtection');
+        if (pEl) pEl.checked = appConfig.presetProtection !== false;
         timelineRange.maxFrames = 86400 * frameRate;
         const fpsLabel = document.getElementById('sidebarFpsLabel');
         if (fpsLabel) fpsLabel.innerText = frameRate + ' fps';
@@ -1931,6 +1947,9 @@ setTimeout(function() {
             if (config && config.frameRate) {
                 frameRate = parseInt(config.frameRate) || 25;
                 appConfig = config;
+                // Normalize boolean values from server (SQLite stores as strings)
+                if (appConfig.presetProtection === 'true') appConfig.presetProtection = true;
+                if (appConfig.presetProtection === 'false') appConfig.presetProtection = false;
                 localStorage.setItem('county_config_v8', JSON.stringify(config));
                 if (config.clipper_name) {
                     localStorage.setItem('vcc_clipper_name', config.clipper_name);
@@ -2495,12 +2514,23 @@ setTimeout(function() {
         const mgrSelect = document.getElementById('presetSelector');
         if(!progSelect || !mgrSelect) return;
         const c1 = progSelect.value; const c2 = mgrSelect.value;
+        const protection = appConfig.presetProtection !== false && String(appConfig.presetProtection) !== 'false';
         progSelect.innerHTML = ""; mgrSelect.innerHTML = "";
         Object.keys(cuePresets).forEach(function(id) {
-            const opt = document.createElement('option'); opt.value = id; opt.innerText = cuePresets[id].name; progSelect.appendChild(opt);
+            const opt = document.createElement('option'); opt.value = id;
+            const isBuiltin = id.startsWith("pre_") || id.startsWith("news_");
+            const prefix = (protection && isBuiltin) ? '🔒 ' : '';
+            opt.innerText = prefix + cuePresets[id].name;
+            if (isBuiltin && protection) opt.style.color = '#94a3b8';
+            progSelect.appendChild(opt);
         });
         Object.keys(cuePresets).forEach(function(id) {
-            const o2 = document.createElement('option'); o2.value = id; o2.innerText = cuePresets[id].name; mgrSelect.appendChild(o2);
+            const o2 = document.createElement('option'); o2.value = id;
+            const isBuiltin = id.startsWith("pre_") || id.startsWith("news_");
+            const prefix = (protection && isBuiltin) ? '🔒 ' : '';
+            o2.innerText = prefix + cuePresets[id].name;
+            if (isBuiltin && protection) o2.style.color = '#94a3b8';
+            mgrSelect.appendChild(o2);
         });
         if (c1 && cuePresets[c1]) progSelect.value = c1;
         if (c2 && cuePresets[c2]) mgrSelect.value = c2;
@@ -2530,7 +2560,13 @@ setTimeout(function() {
 
     function deletePresetAction() {
         let id = document.getElementById('presetSelector').value;
-        if (!id || id.startsWith("pre_") || id.startsWith("news_")) return;
+        if (!id) return;
+        const isBuiltin = id.startsWith("pre_") || id.startsWith("news_");
+        const protection = appConfig.presetProtection !== false && String(appConfig.presetProtection) !== 'false';
+        if (protection && isBuiltin) {
+            writeLog("🔒 內建 Preset \"" + cuePresets[id].name + "\" 受保護，請到設定頁關閉 Preset 保護後再刪除", 'warn');
+            return;
+        }
         if (confirm("確定刪除此預設集？")) {
             delete cuePresets[id];
             localStorage.setItem('county_presets_v8', JSON.stringify(cuePresets));
