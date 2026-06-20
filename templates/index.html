@@ -538,7 +538,6 @@
                         <div class="console-terminal" id="consoleTerminal"></div>
                     </div>
                 </div>
-                </div>
             </div>
 
             <!-- 觸發記錄 Modal（固定定位，放在頁面根層級） -->
@@ -550,6 +549,59 @@
                     </div>
                     <div id="triggerHistoryList" style="flex:1; overflow-y:auto; padding:12px 20px; font-size:12px; font-family:monospace; line-height:1.8;">
                         <div style="color:#64748b; text-align:center; padding:30px 0;">尚無觸發記錄</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== 更新日誌頁 ===== -->
+            <div id="page-changelog" class="page">
+                <div class="panel-box">
+                    <div class="panel-header-box"><div class="panel-title">📜 更新日誌</div></div>
+                    <div style="font-size:13px; color:#cbd5e1; line-height:1.8;" id="changelogContent">載入中...</div>
+                </div>
+            </div>
+
+            <!-- ===== 操作說明頁 ===== -->
+            <div id="page-help" class="page">
+                <div class="panel-box">
+                    <div class="panel-header-box"><div class="panel-title">📖 操作說明</div></div>
+                    <div class="help-section">
+                        <h2>County 系統操作指南</h2>
+                        <p>本系統為廣播電視台排控中心設計，提供節目排程管理、Cue 提示點觸發、時間軸視覺化等功能。</p>
+                        <h3>📡 首頁 (MCR Home)</h3>
+                        <ul>
+                            <li><strong>ENGINE 啟動</strong> — 點擊「啟動主控監測」開始監控排程</li>
+                            <li><strong>時序矩陣</strong> — 顯示前後各 3 項節目，自動對齊「即將進行」</li>
+                            <li><strong>Cue 倒數</strong> — 自動計算下一個 Cue 點倒數時間</li>
+                            <li><strong>快速修改</strong> — 直接調整當前播送節目的開始時間或長度</li>
+                        </ul>
+                        <h3>📅 排程管理</h3>
+                        <ul>
+                            <li><strong>行事曆</strong> — 點選日期切換觀測日，有節目的日期以紫色標示</li>
+                            <li><strong>新增/編輯節目</strong> — 填入名稱、時碼、長度、週期後儲存</li>
+                            <li><strong>週期設定</strong> — 支援每日、工作日、每週、自訂星期</li>
+                            <li><strong>搜尋</strong> — 在節目表上方輸入名稱快速過濾</li>
+                        </ul>
+                        <h3>📋 Preset 管理</h3>
+                        <ul>
+                            <li><strong>節點設定</strong> — 設定 Cue 提示點（偏移方式/秒數/名稱/提示音）</li>
+                            <li><strong>排序</strong> — 拖曳調整節點順序，或點擊表頭排序</li>
+                            <li><strong>JSON 匯出入</strong> — 備份或還原 Preset 設定</li>
+                        </ul>
+                        <h3>🛠️ 設定</h3>
+                        <ul>
+                            <li><strong>NTP 同步</strong> — 連接香港天文台 stdtime.gov.hk 精確校時</li>
+                            <li><strong>FPS</strong> — PAL 25 / NTSC 29.97 / 電影 24</li>
+                            <li><strong>時區</strong> — 影響換日與 Cue 觸發時間</li>
+                            <li><strong>Crash Dump</strong> — 生成系統狀態報告供除錯</li>
+                        </ul>
+                        <h3>⌨️ 快捷鍵</h3>
+                        <ul>
+                            <li><kbd>Space</kbd> — 切換 ENGINE 啟動/停止</li>
+                            <li><kbd>Ctrl+1</kbd>～<kbd>6</kbd> — 切換分頁</li>
+                            <li><kbd>Ctrl+S</kbd> — 儲存 Preset（Preset 頁面）</li>
+                        </ul>
+                        <div class="tip">💡 滑鼠懸停在矩陣 Cue 點上可查看詳細資訊。</div>
                     </div>
                 </div>
             </div>
@@ -1423,6 +1475,16 @@
             if (badge) badge.className = 'clipper-badge';
         }
         if (pageId === 'settings') { refreshJsonInspectorProbe(); refreshConfigJsonArea(); fetchServerLog(); }
+        if (pageId === 'changelog') {
+            // Populate changelog from CHANGELOG.md
+            fetch('/static/CHANGELOG.md').then(function(r){return r.text();}).then(function(t){
+                var el = document.getElementById('changelogContent');
+                if (el) el.innerHTML = '<pre style=\"font-family:inherit;white-space:pre-wrap;font-size:13px;line-height:1.8;\">' + escapeHtml(t) + '</pre>';
+            }).catch(function(){
+                var el = document.getElementById('changelogContent');
+                if (el) el.innerText = '⚠️ 無法載入更新日誌';
+            });
+        }
         // 跨頁面 CUE 引擎：由 _masterTimer/masterTick 統一處理，無需重建
         if (pageId === 'live' && isTrackingActive) {
             adjustMatrixHeight();
