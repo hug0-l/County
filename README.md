@@ -490,3 +490,65 @@ const MATRIX_COLORS = [
 ---
 
 *本架構文件由 AI 輔助生成，最後更新於 2026-06-19*
+
+---
+
+## 11. NTP 時間服務（v0.6 新增）
+
+### 11.1 概述
+VCC PRE v0.6 新增 HTTP-based 時間同步功能，取代原本的假 NTP 檢查。系統可從指定的 HTTP 時間伺服器取得標準時間，計算與本地時鐘的偏移量，並將偏移量套用至所有 Cue 觸發計算。
+
+### 11.2 架構
+```
+NTPManager (全域 JS 物件)
+├── 狀態: connected | fallback | local | syncing | error
+├── offset: 伺服器時間 - Date.now() (毫秒)
+├── async sync(url): fetch → parse → 計算偏移
+│   ├── 成功 → 儲存偏移, 更新狀態
+│   └── 失敗 → 保留前次偏移, 降級至本地時鐘
+└── 自動同步 setInterval
+
+getCalibratedDate()
+  └── Date.now() + timeOffset → 時區轉換
+```
+
+### 11.3 設定項目
+
+| 設定項 | ID | 類型 | 說明 |
+|-------|-----|------|------|
+| NTP 伺服器 URL | `cfgNtpUrl` | Input | HTTP 時間 API 位址 |
+| 自動同步間隔 | `cfgNtpInterval` | Number | 秒數（0=關閉） |
+| 狀態 | `settingsNtpStatus` | Display | 🟢 已同步 / ⚠️ 降級 / 🔴 錯誤 |
+| 立即同步 | `btnNtpSync` | Button | 手動觸發同步 |
+
+### 11.4 預設伺服器
+```javascript
+'https://worldtimeapi.org/api/timezone/Asia/Hong_Kong'
+```
+使用香港天文台時區（Asia/Hong_Kong），與系統預設時區一致。支援 CORS，可在瀏覽器中直接使用。
+
+### 11.5 支援的回應格式
+| 欄位 | 來源範例 | 說明 |
+|------|---------|------|
+| `datetime` | worldtimeapi | ISO 8601 完整時間字串 |
+| `utc_datetime` | 其他 API | UTC ISO 8601 |
+| `unixtime` | 多種 API | Unix 時間戳（秒） |
+
+### 11.6 持久化
+- `vcc_pre_ntp_offset` — 上次成功偏移量 (ms)
+- `vcc_pre_ntp_last_sync` — 上次同步時間 (ISO)
+- `vcc_pre_ntp_server_url` — 設定的伺服器 URL
+- `vcc_pre_ntp_interval` — 自動同步間隔 (秒)
+
+所有 NTP 設定也保存在 `vcc_pre_config_v8` 的 `appConfig.ntp*` 字段中，可透過 Config JSON 面板匯出/匯入。
+
+### 11.7 已知限制
+- ⚠️ **瀏覽器無法使用原始 NTP (UDP 123)**，必須使用 HTTP 時間 API
+- ⚠️ **時間 API 需要支援 CORS**，否則會觸發跨域錯誤
+- ⚠️ **worldtimeapi.org 為第三方服務**，若該服務不可用，系統自動降級至本地時鐘
+- ⚠️ **偏移量精度受網路延遲影響**，一般情況下誤差在 50–200ms 內
+
+### 11.8 發展備註
+- 2026-06-20: 新增 NTP 時間服務、NTPManager 物件、設定頁 NTP 面板、自動同步定時器
+
+*本架構文件由 AI 輔助生成，最後更新於 2026-06-20*
