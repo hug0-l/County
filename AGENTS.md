@@ -11,15 +11,37 @@
 county/
 ├── server.py                        # 🚀 Python 後端 (FastAPI + SQLite + ntplib)
 ├── requirements.txt                 # Python 依賴
+├── county.spec                      # PyInstaller 打包設定
 ├── templates/
-│   └── index.html                   # 📄 主系統 SPA（所有 JS/CSS/HTML 集中此檔）
-├── static/                          # 靜態資源目錄
+│   └── index.html                   # 📄 HTML 骨架 (~800行)
+├── static/
+│   ├── county.css                   # 🎨 樣式表
+│   ├── county-core.js               # 命名空間 + 模組載入器
+│   ├── county-helpers.js            # 工具函數
+│   ├── county-config.js             # 設定管理
+│   ├── county-api.js                # API 客戶端
+│   ├── county-time.js               # 時碼 + NTP
+│   ├── county-log.js                # 日誌系統
+│   ├── county-data.js               # 資料層
+│   ├── county-sound.js              # 音效系統
+│   ├── county-engine.js             # CUE 引擎
+│   ├── county-ui-live.js            # 首頁 UI
+│   ├── county-ui-rundown.js         # 排程頁 UI
+│   ├── county-ui-preset.js          # Preset 頁 UI
+│   ├── county-ui-settings.js        # 設定頁 UI
+│   ├── county-ui-clipper.js         # Clipper IM UI
+│   ├── clipper-sdk.js               # Clipper SDK
+│   ├── clipper-message-bus.js       # 事件匯流排
+│   ├── clipper-ws-manager.js        # WS 管理器
+│   ├── clipper-module-base.js       # 模組基底
+│   ├── clipper-chat-module.js       # 聊天模組
+│   ├── clipper-files-module.js      # 檔案傳輸模組
+│   └── CHANGELOG.md                 # 版本歷史
+├── tests/
+│   └── smoke_test.py                # 整合測試
 ├── backups/                         # 自動備份目錄
-├── county.db                       # SQLite 資料庫（執行後自動產生）
-├── README.md                        # 架構文件（開發前請先閱讀）
-├── AGENTS.md                        # 本文件（Agent 工作指引）
-├── CHANGELOG.md                     # 版本歷史
-└── templates/index.html          # 前端 SPA（由 server.py 提供服務）
+├── county.db                       # SQLite 資料庫
+└── logs/                            # 伺服器日誌
 ```
 
 > 啟動方式：`pip install -r requirements.txt && python server.py`
@@ -130,32 +152,37 @@ offset_ms = response.offset * 1000  # seconds → ms
 
 ## 📦 模組載入順序（由 `index.html` 的 `<script>` 標籤順序決定）
 
-所有 JavaScript 模組存放於 `static/` 目錄，透過 `County.register()` 註冊。載入順序如下：
+所有 JavaScript 模組存放於 `static/` 目錄（共 22 個檔案）。載入順序如下：
 
-| 順序 | 檔案 | 依賴 |
+| 順序 | 檔案 | 說明 |
 |------|------|------|
-| 1 | `clipper-sdk.js` | （無 — 定義 `ClipperSDK` 類別） |
-| 2 | `county-core.js` | （無 — 定義 `County.register()` / `County.init()` 載入器） |
-| 3 | `county-helpers.js` | `window.*` 全域函數（escapeHtml, formatSize, toggleSidebar, 時碼工具） |
-| 4 | `county-config.js` | `window.appConfig`, `window.NTPManager` |
-| 5 | `county-api.js` | `County.register('API', ...)` — API 客戶端 |
-| 6 | `county-log.js` | `County.register('Log', ...)` — 日誌模組 |
-| 7 | `county-time.js` | `County.register('Time', ...)` — 時碼轉換、NTPManager |
-| 8 | `county-data.js` | `County.register('Data', ...)` — 資料層、行事曆、週期邏輯 |
-| 9 | `county-sound.js` | `County.register('Sound', ...)` — 音效系統 |
-| 10 | `county-engine.js` | `County.register('Engine', ...)` — CUE 引擎 |
-| 11 | `county-ui-live.js` | `County.register('LiveUI', ...)` — 首頁儀表板 |
-| 12 | `county-ui-rundown.js` | `County.register('RundownUI', ...)` — 排程頁 |
-| 13 | `county-ui-preset.js` | `County.register('PresetUI', ...)` — Preset 頁 |
-| 14 | `county-ui-settings.js` | `County.register('SettingsUI', ...)` — 設定頁 |
-| 15 | `county-ui-clipper.js` | `County.register('ClipperUI', ...)` — Clipper IM UI |
-| 16 | `index.html` 內嵌 `<script>` | 所有模組（最後載入，透過 `window.*` 存取） |
+| 1 | `clipper-sdk.js` | Clipper WebSocket SDK |
+| 2 | `clipper-message-bus.js` | 事件匯流排（MessageBus） |
+| 3 | `clipper-ws-manager.js` | WS 管理器（自動重連、型別路由） |
+| 4 | `clipper-module-base.js` | ClipperModule 基底類別 |
+| 5 | `clipper-chat-module.js` | 聊天模組（編輯/刪除/回覆/Load More） |
+| 6 | `clipper-files-module.js` | 檔案傳輸模組（SHA-256/佇列/取消） |
+| 7 | `county-core.js` | **必須首位** — County 命名空間 + register() |
+| 8 | `county-helpers.js` | 全域工具函數 |
+| 9 | `county-config.js` | Config 管理 |
+| 10 | `county-api.js` | API 客戶端 |
+| 11 | `county-log.js` | 日誌系統 |
+| 12 | `county-time.js` | 時碼轉換 + NTP |
+| 13 | `county-data.js` | 資料層 |
+| 14 | `county-sound.js` | 音效系統 |
+| 15 | `county-engine.js` | CUE 引擎 |
+| 16 | `county-ui-live.js` | 首頁 UI |
+| 17 | `county-ui-rundown.js` | 排程頁 UI |
+| 18 | `county-ui-preset.js` | Preset 頁 UI |
+| 19 | `county-ui-settings.js` | 設定頁 UI |
+| 20 | `county-ui-clipper.js` | Clipper IM UI |
+| 21 | `index.html` 內嵌 `<script>` | 主要應用邏輯（最後載入） |
 
 **重要規則：**
-- `county-core.js` **必須**在第一個被載入（它定義 `County` 命名空間與 `register()` 方法）
-- UI 模組（`county-ui-*`）依賴引擎模組（`county-engine.js`）與資料層（`county-data.js`）
-- `clipper-sdk.js` 需在 `county-ui-clipper.js` 之前載入
-- 載入順序錯誤會導致 `County is not defined` 或 `module is not a function` 錯誤
+- `county-core.js` **必須**在 county 模組第一個被載入
+- `clipper-message-bus.js` 需在 `clipper-ws-manager.js` 之前
+- `clipper-module-base.js` 需在 `clipper-chat-module.js` / `clipper-files-module.js` 之前
+- 載入順序錯誤會導致 ReferenceError 或 TypeError
 
 ## 🏗️ 靜態檔案清單
 
@@ -191,8 +218,29 @@ python3 tests/smoke_test.py
 此腳本會檢查：
 1. 所有 `.js` 檔案的語法（`node --check`）
 2. `server.py` 的 Python 語法（`py_compile`）
-3. 靜態檔案完整性（16 個預期檔案全部存在）
+3. 靜態檔案完整性
 4. HTML 結構（7 個分頁 ID 全部存在）
+
+## ✅ 快速驗證清單（每次修改後）
+
+- [ ] 伺服器啟動無錯誤：`python server.py`
+- [ ] 瀏覽器訪問 `http://localhost:8000` 無 console error
+- [ ] 時鐘正常運作（每秒刷新）
+- [ ] NTP 自動同步，狀態顯示正確（已同步/本地時鐘）
+- [ ] 設定頁 NTP 面板可操作（伺服器 URL、間隔、立即同步）
+- [ ] 時間格式正確（HH:MM:SS:FF）
+- [ ] 排程 CRUD 正常（新增/編輯/刪除/複製）
+- [ ] 資料持久化：重新整理後資料仍在
+- [ ] 後端離線時 localStorage 降級正常
+- [ ] ENGINE 啟動/停止正常
+- [ ] Cue 觸發顯示正確（矩陣高亮、Popup、音效）
+- [ ] 備份下載 → JSON 格式正確
+- [ ] 備份還原 → 資料完整恢復
+- [ ] Clipper IM 分頁載入正常，預設顯示名稱 VPRE
+- [ ] Clipper 分頁連線成功（🟢 已連線）
+- [ ] Clipper 聊天收發正常
+- [ ] Clipper 檔案傳輸（先選對象 → 拖放 → 進度條 → 自動下載）
+- [ ] Clipper 檔案接收進度條正常更新
 
 ## 📝 版本控制
 - Branch: `main`（正式版）
