@@ -792,6 +792,18 @@
                             </div>
                         </div>
                         <div class="panel-box" style="margin-top:15px;">
+                            <div class="panel-header-box">
+                                <div class="panel-title">📋 伺服器日誌 (Server Log)</div>
+                                <div style="display:flex; gap:4px;">
+                                    <button class="btn-ctrl btn-export-ui" id="btnFetchServerLog" onclick="fetchServerLog()" style="padding:2px 8px; font-size:10px;">🔄 刷新</button>
+                                    <button class="btn-ctrl btn-export-ui" onclick="downloadServerLog()" style="padding:2px 8px; font-size:10px;">⬇ 匯出</button>
+                                </div>
+                            </div>
+                            <div style="font-size:11px; color:#9ca3af; margin-bottom:6px;">由後端記錄，24h 自動輪換</div>
+                            <textarea id="serverLogArea" readonly style="width:100%; height:160px; background:#030712; border:1px solid #374151; color:#a7f3d0; padding:6px; font-family:monospace; font-size:11px; border-radius:4px; resize:vertical; margin-bottom:4px;"></textarea>
+                            <div style="font-size:11px; color:#4b5563; text-align:right;"><span id="serverLogLines">0</span> 行</div>
+                        </div>
+                        <div class="panel-box" style="margin-top:15px;">
                             <div class="panel-header-box"><div class="panel-title">⚡ 開發者選項</div></div>
                             <div class="input-form" style="grid-template-columns: 1fr;">
                                 <div class="input-group">
@@ -1724,6 +1736,41 @@
         }
     }
 
+    // ===== Server log viewer (Settings page) =====
+    function fetchServerLog() {
+        const area = document.getElementById('serverLogArea');
+        const btn = document.getElementById('btnFetchServerLog');
+        if (!area) return;
+        btn.innerText = '⏳ 載入中…';
+        btn.disabled = true;
+        fetch('/api/log/recent?lines=200', { signal: AbortSignal.timeout(5000) })
+            .then(function(res) { return res.text(); })
+            .then(function(text) {
+                area.value = text;
+                document.getElementById('serverLogLines').textContent = text.split('\n').filter(function(l){return l.trim();}).length;
+            })
+            .catch(function() {
+                area.value = '⚠️ 無法連線至伺服器，請確認 server.py 正在執行';
+            })
+            .finally(function() {
+                btn.innerText = '🔄 刷新';
+                btn.disabled = false;
+            });
+    }
+
+    function downloadServerLog() {
+        const area = document.getElementById('serverLogArea');
+        if (!area || !area.value.trim()) { alert('尚無日誌內容，請先點擊「刷新」'); return; }
+        const blob = new Blob([area.value], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'vcc_pre_server_log_' + new Date().toISOString().split('T')[0] + '.log';
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+        writeLog('⬇ 伺服器日誌已匯出', 'success');
+    }
+
     function switchPage(pageId) {
         document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
         document.querySelectorAll('.menu-item').forEach(function(m) { m.classList.remove('active'); });
@@ -1739,7 +1786,7 @@
                 setTimeout(clipperConnect, 500);
             }
         }
-        if (pageId === 'settings') { refreshJsonInspectorProbe(); refreshConfigJsonArea(); }
+        if (pageId === 'settings') { refreshJsonInspectorProbe(); refreshConfigJsonArea(); fetchServerLog(); }
         // 跨頁面 CUE 引擎：全頁面運作，永遠監聽 CUE 觸發
         if (isTrackingActive) {
             if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
@@ -2067,9 +2114,21 @@
         loadConfig();
 
         // 從 localStorage 載入（同步快速啟動），非同步從 IndexedDB 補齊
+        // 載入 Preset，若有舊版 std_news 則遷移至新 Preset
         const localPresets = localStorage.getItem('vcc_pre_presets_v8');
-        if (localPresets) { try { cuePresets = JSON.parse(localPresets); } catch(e) { loadDefaultPresets(); } }
-        else { loadDefaultPresets(); }
+        if (localPresets) {
+            try {
+                cuePresets = JSON.parse(localPresets);
+                // Migration: replace old std_news/short_promo with new presets
+                if (cuePresets["std_news"] || cuePresets["short_promo"]) {
+                    delete cuePresets["std_news"];
+                    delete cuePresets["short_promo"];
+                    var _mNew = getDefaultPresets();
+                    for (var _mk in _mNew) { if (!cuePresets[_mk]) cuePresets[_mk] = _mNew[_mk]; }
+                    localStorage.setItem('vcc_pre_presets_v8', JSON.stringify(cuePresets));
+                }
+            } catch(e) { loadDefaultPresets(); }
+        } else { loadDefaultPresets(); }
         const localDB = localStorage.getItem('vcc_pre_master_db_v8');
         if (localDB) { try { masterScheduleDB = JSON.parse(localDB); } catch(e) { masterScheduleDB = []; } }
         
@@ -2462,8 +2521,8 @@
         document.getElementById('presetJsonArea').value = '';
     }
 
-    function loadDefaultPresets() {
-        cuePresets = {
+    function getDefaultPresets() {
+        return {
             "pre_broadcast": {
                 name: "播出前倒數",
                 nodes: [
@@ -2486,6 +2545,10 @@
                 ]
             }
         };
+    }
+
+    function loadDefaultPresets() {
+        cuePresets = getDefaultPresets();
         localStorage.setItem('vcc_pre_presets_v8', JSON.stringify(cuePresets));
     }
 
