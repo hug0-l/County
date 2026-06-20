@@ -688,6 +688,34 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                     <div>
                         <div class="panel-box">
+                            <div class="panel-header-box"><div class="panel-title">🕒 NTP 時間服務</div></div>
+                            <div class="input-form" style="grid-template-columns: 1fr;">
+                                <div class="input-group">
+                                    <label>NTP 伺服器</label>
+                                    <input type="text" id="cfgNtpUrl" value="time.hko.hk" onchange="saveConfig()" style="width:100%;">
+                                    <div style="font-size:11px; color:#64748b; margin-top:4px;">使用真實 NTP (UDP 123) 協定，由伺服器端 ntplib 處理</div>
+                                </div>
+                                <div class="input-group">
+                                    <label>自動同步間隔（秒）</label>
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <input type="number" id="cfgNtpInterval" value="600" min="0" max="86400" style="width:100px;" onchange="saveConfig(); restartAutoSync();">
+                                        <span style="font-size:11px; color:#64748b;">0 = 關閉</span>
+                                    </div>
+                                </div>
+                                <div class="input-group">
+                                    <label>狀態</label>
+                                    <div id="settingsNtpStatus" style="font-size:13px; color:#9ca3af;">尚未同步</div>
+                                </div>
+                                <div class="input-group">
+                                    <label>最後同步時間</label>
+                                    <div id="settingsNtpLastSync" style="font-size:12px; color:#64748b; font-family:monospace;">—</div>
+                                </div>
+                                <div class="input-group" style="margin-top:4px;">
+                                    <button class="btn-start" id="btnNtpSync" onclick="handleManualNtpSync()" style="font-size:12px; padding:8px 16px;">🔄 立即同步</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="panel-box">
                             <div class="panel-header-box"><div class="panel-title">🔊 音訊設定</div></div>
                             <div class="input-form" style="grid-template-columns: 1fr;">
                                 <div class="input-group">
@@ -1169,48 +1197,38 @@
         },
         timerId: null,          // auto-sync interval ID
 
-        // Core sync: fetch URL, parse time, compute offset
+        // Core sync: use backend API for NTP
         async sync(url) {
             this.status = 'syncing';
             updateNtpStatusUI();
-            url = url || this.config.ntpServerUrl;
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
             try {
-                const res = await fetch(url, { signal: controller.signal });
-                const data = await res.json();
-                let serverEpoch = 0;
-                if (data.datetime) {
-                    serverEpoch = new Date(data.datetime).getTime();
-                } else if (data.utc_datetime) {
-                    serverEpoch = new Date(data.utc_datetime).getTime();
-                } else if (data.unixtime) {
-                    serverEpoch = parseInt(data.unixtime) * 1000;
-                }
-                if (!serverEpoch) throw new Error('無法解析伺服器時間');
-                this.offset = serverEpoch - Date.now();
-                this.lastSyncTime = new Date().toISOString();
-                timeOffset = this.offset;
-                this.status = 'connected';
-                this.errorMsg = '';
-                // Persist
-                localStorage.setItem('vcc_pre_ntp_offset', String(this.offset));
-                localStorage.setItem('vcc_pre_ntp_last_sync', this.lastSyncTime);
-                appConfig.ntpLastOffset = this.offset;
-                appConfig.ntpLastSyncTime = this.lastSyncTime;
-                saveConfig();
-            } catch(err) {
-                if (err.name === 'AbortError') {
-                    this.errorMsg = '連線超時 (5s)';
+                const result = await API.ntpSync();
+                if (result && result.status === 'connected') {
+                    this.status = 'connected';
+                    this.offset = result.offset_ms;
+                    this.lastSyncTime = result.last_sync;
+                    this.errorMsg = '';
+                    timeOffset = this.offset;
+                    // Persist locally too
+                    localStorage.setItem('vcc_pre_ntp_offset', String(this.offset));
+                    localStorage.setItem('vcc_pre_ntp_last_sync', this.lastSyncTime);
+                    appConfig.ntpLastOffset = this.offset;
+                    appConfig.ntpLastSyncTime = this.lastSyncTime;
+                    saveConfig();
+                } else if (result) {
+                    this.status = result.status;  // 'error' or 'fallback'
+                    this.errorMsg = result.error_msg || 'NTP 同步失敗';
+                    // Keep existing offset (don't overwrite)
                 } else {
-                    this.errorMsg = err.message || '同步失敗';
+                    // API call failed — server might be down
+                    this.status = this.offset !== 0 ? 'fallback' : 'local';
+                    this.errorMsg = '無法連線至伺服器 NTP 服務';
                 }
-                // 保留上一次成功的 offset，不改動 timeOffset
+            } catch(err) {
                 this.status = this.offset !== 0 ? 'fallback' : 'local';
-            } finally {
-                clearTimeout(timeoutId);
-                updateNtpStatusUI();
+                this.errorMsg = err.message || 'NTP 同步例外錯誤';
             }
+            updateNtpStatusUI();
         }
     };
 
@@ -1327,7 +1345,20 @@
         appConfig.timezone = document.getElementById('cfgTimezone').value;
         appConfig.retentionSeconds = parseInt(document.getElementById('cfgRetentionSec').value) || 5;
         appConfig.lastSelectedDate = document.getElementById('globalTargetDate').value;
-        appConfig.ntpServerUrl = NTPManager.config.ntpServerUrl;
+        appConfig.ntpServerUrl = NTPManager.config.ntpServerUrl;        // Read NTP UI fields into NTPManager.config
+        const ntpUrlInput = document.getElementById('cfgNtpUrl');
+        const ntpIntervalInput = document.getElementById('cfgNtpInterval');
+        if (ntpUrlInput) {
+            NTPManager.config.ntpServerUrl = ntpUrlInput.value;
+            appConfig.ntpServerUrl = ntpUrlInput.value;
+            localStorage.setItem('vcc_pre_ntp_server_url', ntpUrlInput.value);
+        }
+        if (ntpIntervalInput) {
+            NTPManager.config.ntpAutoSyncInterval = parseInt(ntpIntervalInput.value) || 0;
+            appConfig.ntpAutoSyncInterval = parseInt(ntpIntervalInput.value) || 0;
+            localStorage.setItem('vcc_pre_ntp_interval', String(parseInt(ntpIntervalInput.value) || 0));
+        }
+
         appConfig.ntpAutoSyncInterval = NTPManager.config.ntpAutoSyncInterval;
         appConfig.ntpLastOffset = NTPManager.offset;
         appConfig.ntpLastSyncTime = NTPManager.lastSyncTime || '';
@@ -1372,8 +1403,15 @@
             NTPManager.status = 'fallback';
         }
     }
+        // Restore NTP config inputs
+        const ntpUrl = document.getElementById('cfgNtpUrl');
+        const ntpInterval = document.getElementById('cfgNtpInterval');
+        if (ntpUrl && appConfig.ntpServerUrl) ntpUrl.value = appConfig.ntpServerUrl;
+        if (ntpInterval && appConfig.ntpAutoSyncInterval) ntpInterval.value = appConfig.ntpAutoSyncInterval;
 
-    function updateNtpStatusUI() {
+    function updateNtpStatusUI() {        // Also update settings UI when available
+        updateSettingsNtpUI();
+
         const badge = document.getElementById('syncBadge');
         const ntpStatusEl = document.getElementById('ntpStatus');
         if (!badge) return;
@@ -2508,19 +2546,41 @@
     }
 
     function syncWithNetworkTime(callback) {
-        const storedOffset = parseInt(localStorage.getItem('vcc_pre_ntp_offset') || '0');
-        const storedSyncTime = localStorage.getItem('vcc_pre_ntp_last_sync') || '';
-        if (storedOffset) {
-            timeOffset = storedOffset;
-            NTPManager.offset = storedOffset;
-            NTPManager.lastSyncTime = storedSyncTime;
-            NTPManager.status = storedOffset !== 0 ? 'fallback' : 'local';
-        }
-        // 嘗試同步
-        NTPManager.sync(NTPManager.config.ntpServerUrl).finally(function() {
+        // First try API.ntpStatus() to get current server state
+        API.ntpStatus().then(function(statusResult) {
+            if (statusResult && statusResult.status === 'connected') {
+                NTPManager.status = 'connected';
+                NTPManager.offset = statusResult.offset_ms || 0;
+                NTPManager.lastSyncTime = statusResult.last_sync || new Date().toISOString();
+                NTPManager.errorMsg = '';
+                timeOffset = NTPManager.offset;
+            } else {
+                // Fallback to stored localStorage offset
+                const storedOffset = parseInt(localStorage.getItem('vcc_pre_ntp_offset') || '0');
+                const storedSyncTime = localStorage.getItem('vcc_pre_ntp_last_sync') || '';
+                if (storedOffset) {
+                    timeOffset = storedOffset;
+                    NTPManager.offset = storedOffset;
+                    NTPManager.lastSyncTime = storedSyncTime;
+                    NTPManager.status = storedOffset !== 0 ? 'fallback' : 'local';
+                }
+            }
+        }).catch(function() {
+            // Fallback to stored localStorage offset
+            const storedOffset = parseInt(localStorage.getItem('vcc_pre_ntp_offset') || '0');
+            const storedSyncTime = localStorage.getItem('vcc_pre_ntp_last_sync') || '';
+            if (storedOffset) {
+                timeOffset = storedOffset;
+                NTPManager.offset = storedOffset;
+                NTPManager.lastSyncTime = storedSyncTime;
+                NTPManager.status = storedOffset !== 0 ? 'fallback' : 'local';
+            }
+        }).finally(function() {
             if (callback) callback();
             // ===== Non-blocking API fetch for fresher data =====
             fetchApiData();
+            // Start auto-sync if configured
+            restartAutoSync();
         });
     }
 
@@ -2568,8 +2628,78 @@
 
     function checkNtpStatus() {
         updateNtpStatusUI();
-        // One-shot sync attempt (non-blocking, just for status)
-        NTPManager.sync();
+        // One-shot status check via backend API (non-blocking)        updateNtpStatusUI();
+        // One-shot status check via backend API (non-blocking)
+        API.ntpStatus().then(function(result) {
+            if (result && result.status === 'connected') {
+                NTPManager.status = 'connected';
+                NTPManager.offset = result.offset_ms || 0;
+                NTPManager.lastSyncTime = result.last_sync;
+                NTPManager.errorMsg = '';
+                timeOffset = NTPManager.offset;
+            } else if (result) {
+                NTPManager.status = result.status;
+                NTPManager.errorMsg = result.error_msg || 'NTP 同步失敗';
+            } else {
+                NTPManager.status = NTPManager.offset !== 0 ? 'fallback' : 'local';
+                NTPManager.errorMsg = '無法連線至伺服器 NTP 服務';
+            }
+            updateNtpStatusUI();
+        }).catch(function() {
+            NTPManager.status = NTPManager.offset !== 0 ? 'fallback' : 'local';
+            NTPManager.errorMsg = 'NTP 狀態查詢例外';
+            updateNtpStatusUI();
+        });
+    }
+
+    function handleManualNtpSync() {
+        const btn = document.getElementById('btnNtpSync');
+        btn.disabled = true;
+        btn.innerText = '⏳ 同步中…';
+        NTPManager.sync().finally(function() {
+            btn.disabled = false;
+            btn.innerText = '🔄 立即同步';
+            updateSettingsNtpUI();
+        });
+    }
+
+    function updateSettingsNtpUI() {
+        const statusEl = document.getElementById('settingsNtpStatus');
+        const lastSyncEl = document.getElementById('settingsNtpLastSync');
+        if (!statusEl) return;
+
+        const s = NTPManager.status;
+        if (s === 'connected') {
+            statusEl.innerHTML = '🟢 <span style="color:#34d399;">已同步 — 伺服器真實 NTP</span>';
+        } else if (s === 'syncing') {
+            statusEl.innerHTML = '🔄 <span style="color:#60a5fa;">同步中…</span>';
+        } else if (s === 'fallback') {
+            statusEl.innerHTML = '🟡 <span style="color:#fbbf24;">已降級 (保留前次偏移)</span>';
+        } else if (s === 'error') {
+            statusEl.innerHTML = '🔴 <span style="color:#f87171;">錯誤</span>';
+        } else {
+            statusEl.innerHTML = '⚪ <span style="color:#9ca3af;">未同步 (本地時鐘)</span>';
+        }
+        if (NTPManager.errorMsg) {
+            statusEl.innerHTML += '<br><span style="font-size:11px; color:#ef4444;">' + NTPManager.errorMsg + '</span>';
+        }
+        if (lastSyncEl) {
+            lastSyncEl.innerText = NTPManager.lastSyncTime ? new Date(NTPManager.lastSyncTime).toLocaleString() : '—';
+        }
+    }
+
+    function restartAutoSync() {
+        if (NTPManager.timerId) {
+            clearInterval(NTPManager.timerId);
+            NTPManager.timerId = null;
+        }
+        const interval = parseInt(document.getElementById('cfgNtpInterval').value) || 0;
+        NTPManager.config.ntpAutoSyncInterval = interval;
+        if (interval > 0) {
+            NTPManager.timerId = setInterval(function() {
+                NTPManager.sync();
+            }, interval * 1000);
+        }
     }
 
     // ===== 自適應矩陣高度（填滿視窗剩餘空間） =====
