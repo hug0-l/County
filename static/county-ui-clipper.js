@@ -35,13 +35,13 @@ County.register('ClipperUI', function(C) {
         });
 
         clipper.on('peer-joined', function(peer) {
-            var name = peer.displayName || '\u65B0\u6210\u54E1';
-            U.appendClipperMsg('system', '\uD83D\uDC64 ' + name + ' \u52A0\u5165\u4E86\u623F\u9593');
+            var name = peer.displayName || '新成員';
+            U._showTempJoinLeaveMsg('\uD83D\uDC64 ' + name + ' \u52A0\u5165\u4E86\u623F\u9593');
         });
 
         clipper.on('peer-left', function(peer) {
-            var leftName = peer.displayName || '\u67D0\u6210\u54E1';
-            U.appendClipperMsg('system', '\uD83D\uDC4B ' + leftName + ' \u96E2\u958B\u4E86\u623F\u9593');
+            var leftName = peer.displayName || '某成員';
+            U._showTempJoinLeaveMsg('\uD83D\uDC4B ' + leftName + ' \u96E2\u958B\u4E86\u623F\u9593');
         });
 
         clipper.on('error', function(err) {
@@ -326,6 +326,22 @@ County.register('ClipperUI', function(C) {
                 }
             })(files[i]);
         }
+    };
+
+    U._showTempJoinLeaveMsg = function(text) {
+        var container = document.getElementById('clipperMessages');
+        if (!container) return;
+        var div = document.createElement('div');
+        div.style.cssText = 'text-align:center;color:#64748b;font-size:11px;padding:2px 0;opacity:0.7;transition:opacity 0.5s;';
+        div.textContent = text;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        // 10秒後淡出消失
+        setTimeout(function() {
+            div.style.transition = 'opacity 0.5s';
+            div.style.opacity = '0';
+            setTimeout(function() { if (div.parentNode) div.remove(); }, 550);
+        }, 10000);
     };
 
     return U;

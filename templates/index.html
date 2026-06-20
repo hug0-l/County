@@ -4498,7 +4498,7 @@ setTimeout(function() {
                 var pn = data.displayName || '新成員';
                 APP.state.peers.set(data.peerId, { displayName: pn });
                 APP.state.peerNames.set(data.peerId, pn);
-                chatModule.appendSystemMessage('👤 ' + pn + ' 加入了房間');
+                chatModule.showTemporaryMessage('👤 ' + pn + ' 加入了房間');
                 updateClipperPeerTargetUI();
                 updateClipperPeerCount();
             }
@@ -4511,7 +4511,7 @@ setTimeout(function() {
             if (APP.state.selectedTargetPeerIds) {
                 APP.state.selectedTargetPeerIds.delete(data.peerId);
             }
-            chatModule.appendSystemMessage('👋 ' + leftName + ' 離開了房間');
+            chatModule.showTemporaryMessage('👋 ' + leftName + ' 離開了房間');
             updateClipperPeerTargetUI();
             updateClipperPeerCount();
         }, 'clipper');

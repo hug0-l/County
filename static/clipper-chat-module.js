@@ -59,6 +59,24 @@ class ChatModule extends ClipperModule {
         });
     }
 
+    showTemporaryMessage(text) {
+        const container = document.getElementById(this._opts.messagesId);
+        if (!container) return;
+        const div = document.createElement('div');
+        div.style.cssText = 'align-self:center;text-align:center;font-size:11px;color:#475569;padding:2px 0;opacity:0.7;transition:opacity 0.5s;';
+        div.textContent = text;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        // 10秒後淡出消失，不佔用 localStorage 空間
+        setTimeout(() => {
+            div.style.transition = 'opacity 0.5s';
+            div.style.opacity = '0';
+            setTimeout(() => { if (div.parentNode) div.remove(); }, 550);
+        }, 10000);
+    }
+
+
+
     // ── Module lifecycle ──
 
     _mount() {
@@ -178,6 +196,15 @@ class ChatModule extends ClipperModule {
             text, timestamp, acks: new Set(), totalPeers: peerCount, div: null
         });
 
+        // Persist self-message locally before rendering
+        APP.state.persistedChatMessages.push({ from: APP.state.displayName, text, timestamp, msgId, replyTo });
+        saveToStorage('vcc_chat_messages', APP.state.persistedChatMessages.slice(-200));
+        if (APP.state.persistedChatMessages.length > 200) {
+            APP.state.persistedChatMessages = APP.state.persistedChatMessages.slice(-200);
+        }
+        if (APP.state._chatVisibleCount < APP.state.persistedChatMessages.length) {
+            APP.state._chatVisibleCount++;
+        }
         broadcastToPeers(JSON.stringify(msg));
         this._renderChatMessage(APP.state.displayName, text, timestamp, msgId, replyTo);
 
