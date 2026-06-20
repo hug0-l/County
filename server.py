@@ -12,7 +12,7 @@ import sys
 import threading
 import time
 import webbrowser
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -61,7 +61,7 @@ def log_error(msg: str):   _append_log("ERROR", msg)
 def db_append_client_log(entries: list):
     """Append client log entries to a dedicated log file + print to stderr."""
     for entry in entries:
-        ts = entry.get('ts', datetime.utcnow().isoformat())
+        ts = entry.get('ts', datetime.now(timezone.utc).isoformat())
         level = entry.get('level', 'INFO').upper()
         msg = entry.get('msg', '')
         line = f"[{ts}] [CLIENT-{level}] {msg}"
@@ -187,7 +187,7 @@ def db_get_schedule(id: str) -> dict | None:
 
 def db_upsert_schedule(data: dict) -> dict:
     conn = get_db()
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     tags_json = json.dumps(data.get('tags', []), ensure_ascii=False)
     days_json = json.dumps(data.get('periodicDays', []))
     conn.execute('''INSERT OR REPLACE INTO schedules 
@@ -329,7 +329,7 @@ class NTPManager:
             client = ntplib.NTPClient()
             response = client.request(self.server_url, version=4, timeout=5)
             self.offset_ms = response.offset * 1000  # seconds → ms
-            self.last_sync_time = datetime.utcnow().isoformat()
+            self.last_sync_time = datetime.now(timezone.utc).isoformat()
             self.status = 'connected'
             self.error_msg = ''
             self._log_sync()
@@ -359,7 +359,7 @@ class NTPManager:
             conn.execute(
                 "INSERT INTO ntp_logs (timestamp, status, offset_ms, server_url, error_msg) "
                 "VALUES (?, ?, ?, ?, ?)",
-                (self.last_sync_time or datetime.utcnow().isoformat(),
+                (self.last_sync_time or datetime.now(timezone.utc).isoformat(),
                  self.status,
                  self.offset_ms,
                  self.server_url,
@@ -473,7 +473,7 @@ def startup():
         try:
             data = {
                 'version': '0.6',
-                'exported_at': datetime.utcnow().isoformat(),
+                'exported_at': datetime.now(timezone.utc).isoformat(),
                 'schedules': db_get_schedules(),
                 'presets': [{**p, 'nodes_json': json.dumps(p.get('nodes', []))} for p in db_get_presets()],
                 'config': db_get_all_config()
@@ -578,7 +578,7 @@ def download_backup():
     ntp_logs = db_get_ntp_logs()
     backup = {
         'version': '0.6',
-        'exported_at': datetime.utcnow().isoformat(),
+        'exported_at': datetime.now(timezone.utc).isoformat(),
         'schedules': schedules,
         'presets': presets,
         'config': config,

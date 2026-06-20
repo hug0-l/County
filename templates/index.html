@@ -529,7 +529,7 @@
             <div>
                 <div class="sidebar-header">County 排控調度中心</div>
                 <div class="sidebar-menu">
-                    <div class="menu-item active" id="menu-live" onclick="switchPage('live')">📡 首頁 (MCR Home)</div>
+                    <div class="menu-item active" id="menu-live" onclick="switchPage('live')">📡 首頁</div>
                     <div class="menu-item" id="menu-rundown" onclick="switchPage('rundown')">📅 排程</div>
                     <div class="menu-item" id="menu-preset" onclick="switchPage('preset')">📋 Preset</div>
                     <div class="menu-item" id="menu-settings" onclick="switchPage('settings')">🛠️ 設定</div>
@@ -1022,40 +1022,41 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- ENGINE 觸發記錄 -->
+                    <div class="panel-box">
+                        <div class="panel-header-box">
+                            <div class="panel-title">📜 ENGINE 觸發記錄</div>
+                            <button class="btn-ctrl btn-export-ui" onclick="showTriggerHistory()" style="padding:3px 10px; font-size:10px;">📜 檢視</button>
+                        </div>
+                        <div style="font-size:11px; color:#64748b;">顯示最近觸發的 Cue 點記錄<span id="triggerHistoryCount" style="margin-left:8px; color:#9ca3af;"></span></div>
+                    </div>
+
+                    <!-- 系統日誌 (Console) -->
+                    <div class="panel-box">
+                        <div class="panel-header-box">
+                            <div class="panel-title">系統日誌 (Console)</div>
+                            <div style="display:flex; gap:4px;">
+                                <button class="btn-ctrl btn-export-ui" onclick="exportClientLog()" style="padding:2px 8px; font-size:10px;">📋 匯出日誌</button>
+                                <button class="btn-ctrl btn-import-ui" onclick="document.getElementById('consoleTerminal').innerHTML='';" style="padding:2px 8px; font-size:10px;">🗑 清除</button>
+                            </div>
+                        </div>
+                        <div class="console-terminal" id="consoleTerminal"></div>
                     </div>
                 </div>
-
-                <!-- 觸發記錄按鈕 -->
-                <div class="panel-box" style="margin-top: 5px;">
-                    <div class="panel-header-box">
-                        <div class="panel-title">📜 ENGINE 觸發記錄</div>
-                        <button class="btn-ctrl btn-export-ui" onclick="showTriggerHistory()" style="padding:3px 10px; font-size:10px;">📜 檢視</button>
-                    </div>
-                    <div style="font-size:11px; color:#64748b;">顯示最近觸發的 Cue 點記錄<span id="triggerHistoryCount" style="margin-left:8px; color:#9ca3af;"></span></div>
                 </div>
+            </div>
 
-                <!-- 觸發記錄 Modal -->
-                <div id="triggerHistoryModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;" onclick="if(event.target===this)closeTriggerHistory()">
-                    <div style="background:#111827; border:1px solid #1f2937; border-radius:10px; width:80%; max-width:700px; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
-                        <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid #1f2937;">
-                            <div style="font-size:14px; color:#38bdf8; font-weight:bold;">📜 ENGINE 觸發記錄</div>
-                            <button onclick="closeTriggerHistory()" style="background:transparent; color:#9ca3af; font-size:18px; border:none; cursor:pointer;">✕</button>
-                        </div>
-                        <div id="triggerHistoryList" style="flex:1; overflow-y:auto; padding:12px 20px; font-size:12px; font-family:monospace; line-height:1.8;">
-                            <div style="color:#64748b; text-align:center; padding:30px 0;">尚無觸發記錄</div>
-                        </div>
+            <!-- 觸發記錄 Modal（固定定位，放在頁面根層級） -->
+            <div id="triggerHistoryModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;" onclick="if(event.target===this)closeTriggerHistory()">
+                <div style="background:#111827; border:1px solid #1f2937; border-radius:10px; width:80%; max-width:700px; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid #1f2937;">
+                        <div style="font-size:14px; color:#38bdf8; font-weight:bold;">📜 ENGINE 觸發記錄</div>
+                        <button onclick="closeTriggerHistory()" style="background:transparent; color:#9ca3af; font-size:18px; border:none; cursor:pointer;">✕</button>
                     </div>
-                </div>
-
-                <div class="panel-box" style="margin-top: 5px;">
-                    <div class="panel-header-box">
-                        <div class="panel-title">系統日誌 (Console)</div>
-                        <div style="display:flex; gap:4px;">
-                            <button class="btn-ctrl btn-export-ui" onclick="exportClientLog()" style="padding:2px 8px; font-size:10px;">📋 匯出日誌</button>
-                            <button class="btn-ctrl btn-import-ui" onclick="document.getElementById('consoleTerminal').innerHTML='';" style="padding:2px 8px; font-size:10px;">🗑 清除</button>
-                        </div>
+                    <div id="triggerHistoryList" style="flex:1; overflow-y:auto; padding:12px 20px; font-size:12px; font-family:monospace; line-height:1.8;">
+                        <div style="color:#64748b; text-align:center; padding:30px 0;">尚無觸發記錄</div>
                     </div>
-                    <div class="console-terminal" id="consoleTerminal"></div>
                 </div>
             </div>
 
@@ -1296,7 +1297,10 @@
 
 
     // ===== 全域狀態變數 =====
-    let timerInterval = null;        // 核心引擎 40ms 定時器 (ENGINE)
+    let timerInterval = null;        // (legacy, replaced by _masterTimer)
+    var _masterTimer = null;         // 單一主時脈 40ms 定時器（負責時鐘 + 引擎）
+    var _syncInProgress = false;     // syncAllToServer 防重入旗標
+    var _saveThrottle = null;        // saveToLocalStorage 防抖
     let audioCtx = null;             // 共用 AudioContext（所有提示音）
     let timeOffset = 0;              // 時區偏移（預設 1ms = 使用本地時鐘）
     let isTrackingActive = false;    // ENGINE 是否正在運作
@@ -1910,15 +1914,9 @@
             if (badge) badge.className = 'clipper-badge';
         }
         if (pageId === 'settings') { refreshJsonInspectorProbe(); refreshConfigJsonArea(); fetchServerLog(); }
-        // 跨頁面 CUE 引擎：全頁面運作，永遠監聽 CUE 觸發
-        if (isTrackingActive) {
-            if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-            if (pageId === 'live') {
-                timerInterval = setInterval(updateGlobalDashboard, 40);
-                adjustMatrixHeight();
-            } else {
-                timerInterval = setInterval(checkCueTriggersOnly, 40);
-            }
+        // 跨頁面 CUE 引擎：由 _masterTimer/masterTick 統一處理，無需重建
+        if (pageId === 'live' && isTrackingActive) {
+            adjustMatrixHeight();
         }
     }
 
@@ -2321,7 +2319,18 @@
             checkNtpStatus();
         });
 
-        setInterval(refreshClockOnly, 40);
+        // Create single master timer — handles clock + engine in one tick
+        function masterTick() {
+            refreshClockOnly();                             // always update clock
+            if (!isTrackingActive) return;
+            const livePage = document.getElementById('page-live');
+            if (livePage && livePage.classList.contains('active')) {
+                updateGlobalDashboard();
+            } else {
+                checkCueTriggersOnly();
+            }
+        }
+        _masterTimer = setInterval(masterTick, 40);
 
         // 自適應矩陣高度
         adjustMatrixHeight();
@@ -2747,13 +2756,24 @@
     }
 
     function syncAllToServer() {
-        // Fire-and-forget: POST each schedule and preset to server (non-blocking)
-        masterScheduleDB.forEach(function(prog) {
-            API.saveSchedule(formatForServer(prog));
-        });
-        for (let pid in cuePresets) {
-            API.savePreset({ id: pid, name: cuePresets[pid].name, nodes: cuePresets[pid].nodes });
-        }
+        // Guard: only one sync cycle at a time, prevents connection pool saturation
+        if (_syncInProgress) return;
+        _syncInProgress = true;
+        // Sequential async: one request at a time to avoid N+1 fetch storm
+        (async function() {
+            try {
+                for (let i = 0; i < masterScheduleDB.length; i++) {
+                    await API.saveSchedule(formatForServer(masterScheduleDB[i])).catch(function(){});
+                }
+                for (let pid in cuePresets) {
+                    await API.savePreset({ id: pid, name: cuePresets[pid].name, nodes: cuePresets[pid].nodes }).catch(function(){});
+                }
+            } catch(e) {
+                // ignore — fire-and-forget, server may be offline
+            } finally {
+                _syncInProgress = false;
+            }
+        })();
     }
 
     function formatForServer(prog) {
@@ -2777,8 +2797,9 @@
         localStorage.setItem('county_master_db_v8', JSON.stringify(masterScheduleDB));
         refreshJsonInspectorProbe();
         markDirty();
-        // Also sync to server (non-blocking, fire-and-forget)
-        syncAllToServer();
+        // Debounce server sync — only fires 2s after last edit
+        clearTimeout(_saveThrottle);
+        _saveThrottle = setTimeout(syncAllToServer, 2000);
     }
 
     function refreshPresetDropdownUI() {
@@ -2787,7 +2808,14 @@
         if(!progSelect || !mgrSelect) return;
         const c1 = progSelect.value; const c2 = mgrSelect.value;
         progSelect.innerHTML = ""; mgrSelect.innerHTML = "";
-        }
+        Object.keys(cuePresets).forEach(function(id) {
+            const opt = document.createElement('option'); opt.value = id; opt.innerText = cuePresets[id].name; progSelect.appendChild(opt);
+        });
+        Object.keys(cuePresets).forEach(function(id) {
+            const o2 = document.createElement('option'); o2.value = id; o2.innerText = cuePresets[id].name; mgrSelect.appendChild(o2);
+        });
+        if (c1 && cuePresets[c1]) progSelect.value = c1;
+        if (c2 && cuePresets[c2]) mgrSelect.value = c2;
     }
 
     // ===== Preset 複製 =====
@@ -2811,11 +2839,6 @@
     }
 
     // ===== Preset JSON 匯出/匯入 =====
-            const o2 = document.createElement('option'); o2.value = id; o2.innerText = cuePresets[id].name; mgrSelect.appendChild(o2);
-        }
-        if (c1 && cuePresets[c1]) progSelect.value = c1;
-        if (c2 && cuePresets[c2]) mgrSelect.value = c2;
-    }
 
     function deletePresetAction() {
         let id = document.getElementById('presetSelector').value;
@@ -3108,20 +3131,25 @@
     }
 
     function checkCueTriggersOnly() {
-        // 輕量版：僅檢查 CUE 觸發（不限頁面），不更新 DOM 矩陣
-        if (!isTrackingActive || globalTriggers.length === 0) return;
-        const now = getCalibratedDate();
-        const currentTotalFrames = timecodeToTotalFrames(dateToTimecode(now));
-        const retentionFrames = getRetentionFrames();
-        for (let ci = 0; ci < globalTriggers.length; ci++) {
-            if (globalTriggers[ci].triggered) continue;
-            const diff = globalTriggers[ci].targetFrames - currentTotalFrames;
-            if (diff <= 0 && diff > -retentionFrames) {
-                writeLog("CUE 觸發：" + globalTriggers[ci].fullNodeName, 'warn');
-                playBroadcastBeep(globalTriggers[ci].freq, globalTriggers[ci].soundPreset);
-                sendCueNotification(globalTriggers[ci].progName, globalTriggers[ci].cueName);
-                recordTrigger(globalTriggers[ci]);
-                globalTriggers[ci].triggered = true;
+        try {
+            // 輕量版：僅檢查 CUE 觸發（不限頁面），不更新 DOM 矩陣
+            if (!isTrackingActive || globalTriggers.length === 0) return;
+            const now = getCalibratedDate();
+            const currentTotalFrames = timecodeToTotalFrames(dateToTimecode(now));
+            const retentionFrames = getRetentionFrames();
+            for (let ci = 0; ci < globalTriggers.length; ci++) {
+                if (globalTriggers[ci].triggered) continue;
+                const diff = globalTriggers[ci].targetFrames - currentTotalFrames;
+                if (diff <= 0 && diff > -retentionFrames) {
+                    writeLog("CUE 觸發：" + globalTriggers[ci].fullNodeName, 'warn');
+                    playBroadcastBeep(globalTriggers[ci].freq, globalTriggers[ci].soundPreset);
+                    sendCueNotification(globalTriggers[ci].progName, globalTriggers[ci].cueName);
+                    recordTrigger(globalTriggers[ci]);
+                    globalTriggers[ci].triggered = true;
+                }
+            }
+        } catch (e) {
+            writeLog("CUE 檢查器錯誤: " + e.message, 'error');
         }
     }
 
@@ -3565,6 +3593,7 @@
         if (isTrackingActive) {
             isTrackingActive = false;
             if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+            // _masterTimer keeps running — clock still updates
             if (trackBtn) {
                 trackBtn.style.backgroundColor = ""; trackBtn.innerText = "▶ 啟動主控監測 (RUN ENGINE)";
             }
@@ -3597,11 +3626,7 @@
         writeLog("County 觀測日 [" + targetDateStr + "] 矩陣引擎鎖定並作為主控首頁核心。", 'warn');
 
         calculateGlobalTimelineMatrix(false);
-        if (timerInterval) clearInterval(timerInterval);
-        // 根據當前頁面決定全儀表板還是輕量 CUE 監聽
-        const currentPage = document.querySelector('.page.active');
-        const onLivePage = currentPage && currentPage.id === 'page-live';
-        timerInterval = setInterval(onLivePage ? updateGlobalDashboard : checkCueTriggersOnly, 40);
+        // _masterTimer already running — just toggles via isTrackingActive flag
     }
 
     function calculateGlobalTimelineMatrix(isHotReload) {
@@ -4007,60 +4032,91 @@
             const top2 = distList.length > 1 ? distList[1].idx : -1;
             const top3 = distList.length > 2 ? distList[2].idx : -1;
 
-            // 渲染每一行 + 自動對齊
-            const scrollWrap = document.getElementById('matrixScrollWrap');
-            let firstVisibleInWindow = -1;
-            for (let i = 0; i < globalTriggers.length; i++) {
-                const row = document.getElementById("mx-row-" + i);
-                const statusCell = document.getElementById("mx-status-" + i);
-                if (!row || !statusCell) continue;
+            // === DOM 更新節流：完整矩陣渲染最多每秒 10 次 ===
+            var _lastMatrixRender = _lastMatrixRender || 0;
+            var _matrixRowCache = _matrixRowCache || [];
+            var _matrixStatusCache = _matrixStatusCache || [];
+            var nowMs = Date.now();
+            var shouldRenderMatrix = (nowMs - _lastMatrixRender > 100);
 
-                if (!windowIndices[i]) { row.style.display = "none"; continue; }
-                row.style.display = "";
-                if (firstVisibleInWindow < 0) firstVisibleInWindow = i;
-
-                const diffFrames = globalTriggers[i].targetFrames - currentTotalFrames;
-                const totalCheckSec = Math.ceil(Math.abs(diffFrames) / frameRate);
-                const minPart = Math.floor(totalCheckSec / 60); const secPart = totalCheckSec % 60;
-                const timeStr = (minPart > 0 ? minPart + "m " : "") + secPart + "s";
-
-                if (diffFrames <= 0 && diffFrames > -getRetentionFrames()) {
-                    row.className = "row-trigger-active matrix-row prog-color-" + ((progColorMap[globalTriggers[i].progName] !== undefined) ? progColorMap[globalTriggers[i].progName] : 0);
-                    statusCell.innerText = "🚨 CUE 🚨";
-                    if (!globalTriggers[i].triggered) {
-                        writeLog("自動化 CUE 點觸發：" + globalTriggers[i].fullNodeName, 'warn');
-                        playBroadcastBeep(globalTriggers[i].freq, globalTriggers[i].soundPreset);
-                        sendCueNotification(globalTriggers[i].progName, globalTriggers[i].cueName);
-                        recordTrigger(globalTriggers[i]);
-                        globalTriggers[i].triggered = true;
-                    continue;
-                }
-
-                if (i === top1) {
-                    row.className = "row-imminent matrix-row prog-color-" + ((progColorMap[globalTriggers[i].progName] !== undefined) ? progColorMap[globalTriggers[i].progName] : 0);
-                    statusCell.innerText = "⬤ 即將進行 [-" + timeStr + "]";
-                } else if (i === top2 || i === top3) {
-                    row.className = "row-future matrix-row prog-color-" + ((progColorMap[globalTriggers[i].progName] !== undefined) ? progColorMap[globalTriggers[i].progName] : 0);
-                    const relSign = diffFrames >= 0 ? "後" : "前";
-                    statusCell.innerText = "● " + relSign + timeStr;
-                } else {
-                    row.className = "row-dimmed matrix-row prog-color-" + ((progColorMap[globalTriggers[i].progName] !== undefined) ? progColorMap[globalTriggers[i].progName] : 0);
-                    const relSign2 = diffFrames >= 0 ? "+" : "-";
-                    statusCell.innerText = "○ " + relSign2 + timeStr;
+            // 快取 DOM 參照（首次或長度不符時重建）
+            if (_matrixRowCache.length !== globalTriggers.length) {
+                _matrixRowCache = [];
+                _matrixStatusCache = [];
+                for (let ri = 0; ri < globalTriggers.length; ri++) {
+                    _matrixRowCache[ri] = document.getElementById("mx-row-" + ri);
+                    _matrixStatusCache[ri] = document.getElementById("mx-status-" + ri);
                 }
             }
 
-            // 自動對齊：以「即將進行」(top1) 為中心置中
-            const centerIdx = (top1 >= 0) ? top1 : nearestIdx;
-            if (centerIdx >= 0 && scrollWrap && centerIdx !== lastNearestIdx) {
-                lastNearestIdx = centerIdx;
-                const targetRow = document.getElementById("mx-row-" + centerIdx);
-                if (targetRow) {
-                    scrollWrap.scrollTop = Math.max(0, targetRow.offsetTop - (scrollWrap.clientHeight / 2) + (targetRow.clientHeight / 2));
+            const scrollWrap = document.getElementById('matrixScrollWrap');
+            let firstVisibleInWindow = -1;
+            const retentionFrames = getRetentionFrames();
+
+            // *** 即使節流中，仍需處理 CUE 觸發（必做） ***
+            for (let i = 0; i < globalTriggers.length; i++) {
+                if (!windowIndices[i]) continue;
+                if (globalTriggers[i].triggered) continue;
+                const diffFrames = globalTriggers[i].targetFrames - currentTotalFrames;
+                if (diffFrames <= 0 && diffFrames > -retentionFrames) {
+                    writeLog("自動化 CUE 點觸發：" + globalTriggers[i].fullNodeName, 'warn');
+                    playBroadcastBeep(globalTriggers[i].freq, globalTriggers[i].soundPreset);
+                    sendCueNotification(globalTriggers[i].progName, globalTriggers[i].cueName);
+                    recordTrigger(globalTriggers[i]);
+                    globalTriggers[i].triggered = true;
+                }
+            }
+
+            if (shouldRenderMatrix) {
+                _lastMatrixRender = nowMs;
+
+                // 渲染每一行
+                for (let i = 0; i < globalTriggers.length; i++) {
+                    const row = _matrixRowCache[i];
+                    const statusCell = _matrixStatusCache[i];
+                    if (!row || !statusCell) continue;
+
+                    if (!windowIndices[i]) { row.style.display = "none"; continue; }
+                    row.style.display = "";
+                    if (firstVisibleInWindow < 0) firstVisibleInWindow = i;
+
+                    const diffFrames = globalTriggers[i].targetFrames - currentTotalFrames;
+                    const totalCheckSec = Math.ceil(Math.abs(diffFrames) / frameRate);
+                    const minPart = Math.floor(totalCheckSec / 60); const secPart = totalCheckSec % 60;
+                    const timeStr = (minPart > 0 ? minPart + "m " : "") + secPart + "s";
+
+                    if (diffFrames <= 0 && diffFrames > -retentionFrames) {
+                        row.className = "row-trigger-active matrix-row prog-color-" + ((progColorMap[globalTriggers[i].progName] !== undefined) ? progColorMap[globalTriggers[i].progName] : 0);
+                        statusCell.innerText = "🚨 CUE 🚨";
+                        continue;
+                    }
+
+                    if (i === top1) {
+                        row.className = "row-imminent matrix-row prog-color-" + ((progColorMap[globalTriggers[i].progName] !== undefined) ? progColorMap[globalTriggers[i].progName] : 0);
+                        statusCell.innerText = "⬤ 即將進行 [-" + timeStr + "]";
+                    } else if (i === top2 || i === top3) {
+                        row.className = "row-future matrix-row prog-color-" + ((progColorMap[globalTriggers[i].progName] !== undefined) ? progColorMap[globalTriggers[i].progName] : 0);
+                        const relSign = diffFrames >= 0 ? "後" : "前";
+                        statusCell.innerText = "● " + relSign + timeStr;
+                    } else {
+                        row.className = "row-dimmed matrix-row prog-color-" + ((progColorMap[globalTriggers[i].progName] !== undefined) ? progColorMap[globalTriggers[i].progName] : 0);
+                        const relSign2 = diffFrames >= 0 ? "+" : "-";
+                        statusCell.innerText = "○ " + relSign2 + timeStr;
+                    }
+                }
+
+                // 自動對齊
+                const centerIdx = (top1 >= 0) ? top1 : nearestIdx;
+                if (centerIdx >= 0 && scrollWrap && centerIdx !== lastNearestIdx) {
+                    lastNearestIdx = centerIdx;
+                    const targetRow = _matrixRowCache[centerIdx];
+                    if (targetRow) {
+                        scrollWrap.scrollTop = Math.max(0, targetRow.offsetTop - (scrollWrap.clientHeight / 2) + (targetRow.clientHeight / 2));
+                    }
                 }
             }
         } catch (err) {
-            clearInterval(timerInterval); writeLog("時序核心中斷: " + err.message, 'error');
+            writeLog("時序核心錯誤: " + err.message, 'error');
         }
     }
 
@@ -4158,6 +4214,19 @@
             isTrackingActive: isTrackingActive,
             scheduleCount: masterScheduleDB ? masterScheduleDB.length : 0,
             presetCount: cuePresets ? Object.keys(cuePresets).length : 0,
+            engineInterval: document.getElementById('devEngineInterval') ? document.getElementById('devEngineInterval').value : 'N/A',
+            config: JSON.parse(JSON.stringify(appConfig || {})),
+            schedule: masterScheduleDB.map(function(p) {
+                return { id: p.id, name: p.name, broadcastDate: p.broadcastDate, startTime: p.startTime, periodicType: p.periodicType };
+            }),
+            presets: Object.keys(cuePresets || {}).map(function(k) {
+                return { id: k, name: cuePresets[k].name, nodeCount: cuePresets[k].nodes ? cuePresets[k].nodes.length : 0 };
+            })
+        };
+        area.value = JSON.stringify(dump, null, 2);
+        writeLog("🚑 Crash Dump 已生成", 'info');
+    }
+
     // ===== 觸發記錄管理 =====
     function recordTrigger(t) {
         triggerHistory.unshift({
@@ -4244,18 +4313,6 @@
     });
 
     // ===== Clipper IM Client (SDK Integration) =====
-            engineInterval: document.getElementById('devEngineInterval') ? document.getElementById('devEngineInterval').value : 'N/A',
-            config: JSON.parse(JSON.stringify(appConfig || {})),
-            schedule: masterScheduleDB.map(function(p) {
-                return { id: p.id, name: p.name, broadcastDate: p.broadcastDate, startTime: p.startTime, periodicType: p.periodicType };
-            }),
-            presets: Object.keys(cuePresets || {}).map(function(k) {
-                return { id: k, name: cuePresets[k].name, nodeCount: cuePresets[k].nodes ? cuePresets[k].nodes.length : 0 };
-            })
-        };
-        area.value = JSON.stringify(dump, null, 2);
-        writeLog("🚑 Crash Dump 已生成", 'info');
-    }
 
     function saveCrashDumpToFile() {
         const a = document.getElementById('crashDumpArea');
@@ -4436,6 +4493,9 @@
             input.focus();
         } else {
             appendClipperMsg('system', '❌ 無法發送，請確認已連線');
+        }
+    }
+
     function renderClipperChatRange() {
         const container = document.getElementById('clipperMessages');
         if (!container) return;

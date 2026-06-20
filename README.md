@@ -107,7 +107,7 @@ county/
 | 📜 更新日誌 | `page-changelog` | 版本歷史與更新事項 |
 | 📖 說明 | `page-help` | 操作說明與快捷鍵一覽 |
 
-### 首頁 (MCR Home) 元件層級
+### 首頁元件層級
 
 ```
 page-live
