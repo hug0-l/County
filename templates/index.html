@@ -4132,11 +4132,12 @@
         });
         
         clipper.on('peer-joined', function(peer) {
-            appendClipperMsg('system', '👤 ' + (peer.displayName || peer.peerId) + ' 加入了房間');
+            var name = peer.displayName || '新成員';
+            appendClipperMsg('system', '👤 ' + name + ' 加入了房間');
         });
         
         clipper.on('peer-left', function(peer) {
-            var leftName = peer.displayName || peer.peerId || '某成員';
+            var leftName = peer.displayName || '某成員';
             appendClipperMsg('system', '👋 ' + leftName + ' 離開了房間');
         });
         
@@ -4323,7 +4324,7 @@
         
         var peers = [];
         for (const [pid, info] of clipper._peers) {
-            if (pid !== clipper._peerId) peers.push({ peerId: pid, displayName: info.displayName || pid });
+            if (pid !== clipper._peerId) peers.push({ peerId: pid, displayName: info.displayName || '成員' });
         }
         
         if (peers.length === 0) {
@@ -4352,7 +4353,6 @@
                 var btn = document.createElement('button');
                 btn.textContent = '🖥 ' + peer.displayName;
                 btn.className = 'clipper-peer-btn' + (sel ? ' selected' : '');
-                btn.title = peer.peerId;
                 btn.onclick = function() {
                     if (_clipperSelectedTargets.has(peer.peerId)) {
                         _clipperSelectedTargets.delete(peer.peerId);
