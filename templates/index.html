@@ -795,6 +795,9 @@
                             <button class="btn-ctrl btn-clear-ui" onclick="clearAllPrograms()">全清</button>
                         </div>
                     </div>
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                        <input type="text" id="searchRundown" placeholder="🔍 搜尋節目名稱..." oninput="filterRundown()" style="flex:1; background:#090d16; border:1px solid #374151; color:#fff; padding:6px 10px; border-radius:4px; font-size:12px; outline:none;">
+                    </div>
                     <table class="vcc-pre-table" id="rundownTable">
                         <thead>
                             <tr>
@@ -819,7 +822,10 @@
                     <div class="input-form" style="grid-template-columns: 1fr;">
                         <div class="input-group">
                             <label>選擇 Preset</label>
-                            <select id="presetSelector" onchange="onPresetSelectionChange()"></select>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <select id="presetSelector" onchange="onPresetSelectionChange()" style="flex:1;"></select>
+                                <button class="btn-sync" onclick="duplicatePreset()" style="font-size:11px; padding:5px 10px; white-space:nowrap;">📋 複製</button>
+                            </div>
                         </div>
                         <div class="input-group">
                             <label>名稱</label>
@@ -1014,6 +1020,29 @@
                                 <button class="btn-update" style="padding: 6px 12px;" onclick="applyInjectedJsonState()">注入並套用原始 JSON 變更</button>
                                 <button class="btn-sync" style="padding: 6px 12px;" onclick="refreshJsonInspectorProbe()">刷新探針</button>
                             </div>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+
+                <!-- 觸發記錄按鈕 -->
+                <div class="panel-box" style="margin-top: 5px;">
+                    <div class="panel-header-box">
+                        <div class="panel-title">📜 ENGINE 觸發記錄</div>
+                        <button class="btn-ctrl btn-export-ui" onclick="showTriggerHistory()" style="padding:3px 10px; font-size:10px;">📜 檢視</button>
+                    </div>
+                    <div style="font-size:11px; color:#64748b;">顯示最近觸發的 Cue 點記錄<span id="triggerHistoryCount" style="margin-left:8px; color:#9ca3af;"></span></div>
+                </div>
+
+                <!-- 觸發記錄 Modal -->
+                <div id="triggerHistoryModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;" onclick="if(event.target===this)closeTriggerHistory()">
+                    <div style="background:#111827; border:1px solid #1f2937; border-radius:10px; width:80%; max-width:700px; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid #1f2937;">
+                            <div style="font-size:14px; color:#38bdf8; font-weight:bold;">📜 ENGINE 觸發記錄</div>
+                            <button onclick="closeTriggerHistory()" style="background:transparent; color:#9ca3af; font-size:18px; border:none; cursor:pointer;">✕</button>
+                        </div>
+                        <div id="triggerHistoryList" style="flex:1; overflow-y:auto; padding:12px 20px; font-size:12px; font-family:monospace; line-height:1.8;">
+                            <div style="color:#64748b; text-align:center; padding:30px 0;">尚無觸發記錄</div>
                         </div>
                     </div>
                 </div>
@@ -1245,7 +1274,6 @@
             if (blob) {
                 const url = URL.createObjectURL(blob);
                 let a = document.createElement('a');
-                a.href = url;
                 a.download = 'VCC_PRE_Backup_' + new Date().toISOString().split('T')[0] + '.json';
                 document.body.appendChild(a); a.click(); a.remove();
                 URL.revokeObjectURL(url);
@@ -1275,7 +1303,8 @@
     let masterScheduleDB = [];       // 排程資料庫 [{ id, name, startTime, duration, ... }]
     let globalTriggers = [];         // 展開的 Cue 點陣列 [{ progName, cueName, targetFrames, ... }]
     let currentEditingId = null;     // 正在編輯的排程 ID
-    let cuePresets = {};             // Preset 定義 { id → { name, nodes[] } }
+    let triggerHistory = [];          // CUE 觸發記錄（上限 200 筆）
+
     const progDurations = {};          // Timeline 節目色塊 { progName → { startFrames, endFrames } }
     let frameRate = 25;              // 每秒格數（PAL=25, NTSC=29.97, Film=24）
     const timelineRange = { minFrames: 0, maxFrames: 86400*frameRate };  // Timeline 可視範圍（幀）
@@ -2733,8 +2762,30 @@
         if(!progSelect || !mgrSelect) return;
         const c1 = progSelect.value; const c2 = mgrSelect.value;
         progSelect.innerHTML = ""; mgrSelect.innerHTML = "";
-        for (let id in cuePresets) {
-            const o1 = document.createElement('option'); o1.value = id; o1.innerText = cuePresets[id].name; progSelect.appendChild(o1);
+        }
+    }
+
+    // ===== Preset 複製 =====
+    function duplicatePreset() {
+        let id = document.getElementById('presetSelector').value;
+        if (!id || !cuePresets[id]) return;
+        const source = cuePresets[id];
+        const newId = id + '_copy_' + Date.now();
+        const newName = source.name + ' (複製)';
+        cuePresets[newId] = {
+            name: newName,
+            nodes: JSON.parse(JSON.stringify(source.nodes)) // deep copy
+        };
+        localStorage.setItem('county_presets_v8', JSON.stringify(cuePresets));
+        API.savePreset({ id: newId, name: newName, nodes: cuePresets[newId].nodes });
+        refreshPresetDropdownUI();
+        document.getElementById('presetSelector').value = newId;
+        onPresetSelectionChange();
+        markDirty();
+        writeLog("📋 Preset 已複製: " + newName, 'success');
+    }
+
+    // ===== Preset JSON 匯出/匯入 =====
             const o2 = document.createElement('option'); o2.value = id; o2.innerText = cuePresets[id].name; mgrSelect.appendChild(o2);
         }
         if (c1 && cuePresets[c1]) progSelect.value = c1;
@@ -3044,8 +3095,8 @@
                 writeLog("CUE 觸發：" + globalTriggers[ci].fullNodeName, 'warn');
                 playBroadcastBeep(globalTriggers[ci].freq, globalTriggers[ci].soundPreset);
                 sendCueNotification(globalTriggers[ci].progName, globalTriggers[ci].cueName);
+                recordTrigger(globalTriggers[ci]);
                 globalTriggers[ci].triggered = true;
-            }
         }
     }
 
@@ -3654,10 +3705,11 @@
                 });
             }
             // Program header row (name + time range + tags span all Cue rows)
+            var _progId = firstT.progId;
             matrixBody.innerHTML += '<tr class="matrix-row prog-color-' + cIdx + '" style="background:#0f172a;border-bottom:2px solid #1f2937;">' +
                 '<td colspan="6" style="padding:8px 10px;">' +
                 '<span class="prog-color-dot" style="background:' + MATRIX_COLORS[cIdx] + ';width:12px;height:12px;"></span> ' +
-                '<b style="font-size:14px;">' + pn + '</b>' +
+                '<b style="font-size:14px;cursor:pointer;" onclick="matrixEditProgram(\'' + _progId + '\')" title="點擊編輯此節目">' + pn + '</b>' +
                 tagsHtml +
                 ' <span style="color:#64748b;font-size:11px;font-family:monospace;">[' + progStartTC + ' – ' + progEndTC + ']</span>' +
                 '</td></tr>';
@@ -3954,8 +4006,8 @@
                         writeLog("自動化 CUE 點觸發：" + globalTriggers[i].fullNodeName, 'warn');
                         playBroadcastBeep(globalTriggers[i].freq, globalTriggers[i].soundPreset);
                         sendCueNotification(globalTriggers[i].progName, globalTriggers[i].cueName);
+                        recordTrigger(globalTriggers[i]);
                         globalTriggers[i].triggered = true;
-                    }
                     continue;
                 }
 
@@ -4081,9 +4133,92 @@
             isTrackingActive: isTrackingActive,
             scheduleCount: masterScheduleDB ? masterScheduleDB.length : 0,
             presetCount: cuePresets ? Object.keys(cuePresets).length : 0,
-            triggerCount: globalTriggers ? globalTriggers.length : 0,
-            browserInfo: navigator.userAgent,
-            localStorageKeys: Object.keys(localStorage),
+    // ===== 觸發記錄管理 =====
+    function recordTrigger(t) {
+        triggerHistory.unshift({
+            time: new Date().toISOString(),
+            cue: t.fullNodeName,
+            prog: t.progName,
+            timecode: t.timecodeStr
+        });
+        if (triggerHistory.length > 200) triggerHistory.pop();
+        const countEl = document.getElementById('triggerHistoryCount');
+        if (countEl) countEl.innerText = '(' + triggerHistory.length + ' 筆)';
+    }
+
+    function showTriggerHistory() {
+        const modal = document.getElementById('triggerHistoryModal');
+        const list = document.getElementById('triggerHistoryList');
+        if (!modal || !list) return;
+        if (triggerHistory.length === 0) {
+            list.innerHTML = '<div style="color:#64748b; text-align:center; padding:30px 0;">尚無觸發記錄</div>';
+        } else {
+            let html = '';
+            triggerHistory.forEach(function(entry) {
+                const d = new Date(entry.time);
+                const timeStr = d.toLocaleString('zh-HK', {hour12: false});
+                html += '<div style="padding:6px 0; border-bottom:1px solid #1f2937; display:flex; gap:12px; align-items:center;">' +
+                    '<span style="color:#ef4444; font-weight:bold;">🚨</span>' +
+                    '<span style="color:#94a3b8; font-size:11px; min-width:140px;">' + timeStr + '</span>' +
+                    '<span style="color:#f1f5f9; font-weight:bold;">' + entry.cue + '</span>' +
+                    '<span style="color:#64748b; font-family:monospace;">[' + entry.timecode + ']</span>' +
+                    '</div>';
+            });
+            list.innerHTML = html;
+        }
+        modal.style.display = 'flex';
+    }
+
+    function closeTriggerHistory() {
+        const modal = document.getElementById('triggerHistoryModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    // ===== 搜尋排程 =====
+    function filterRundown() {
+        const query = document.getElementById('searchRundown').value.trim().toLowerCase();
+        const rows = document.querySelectorAll('#rundownTableBody tr');
+        rows.forEach(function(row) {
+            const nameCell = row.querySelector('td:first-child b');
+            if (!nameCell) { row.style.display = ''; return; }
+            const name = nameCell.textContent.toLowerCase();
+            row.style.display = (query === '' || name.indexOf(query) >= 0) ? '' : 'none';
+        });
+    }
+
+    // ===== 矩陣點擊排程編輯 =====
+    function matrixEditProgram(progId) {
+        switchPage('rundown');
+        enterEditMode(progId);
+    }
+
+    // ===== 快捷鍵 =====
+    document.addEventListener('keydown', function(e) {
+        // Space toggle ENGINE (only when not focused on input/textarea)
+        if (e.key === ' ' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && e.target.getAttribute('contenteditable') !== 'true') {
+            e.preventDefault();
+            initGlobalTracking();
+            return;
+        }
+        // Ctrl+1..6 → switchPage
+        if (e.ctrlKey && e.key >= '1' && e.key <= '6') {
+            e.preventDefault();
+            const pages = ['live', 'rundown', 'preset', 'settings', 'clipper', 'changelog'];
+            switchPage(pages[parseInt(e.key) - 1]);
+            return;
+        }
+        // Ctrl+S on preset page → savePresetAction
+        if (e.ctrlKey && (e.key === 's' || e.key === 'S')) {
+            const presetPage = document.getElementById('page-preset');
+            if (presetPage && presetPage.classList.contains('active')) {
+                e.preventDefault();
+                savePresetAction();
+                return;
+            }
+        }
+    });
+
+    // ===== Clipper IM Client (SDK Integration) =====
             engineInterval: document.getElementById('devEngineInterval') ? document.getElementById('devEngineInterval').value : 'N/A',
             config: JSON.parse(JSON.stringify(appConfig || {})),
             schedule: masterScheduleDB.map(function(p) {
