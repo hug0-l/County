@@ -11,11 +11,11 @@ import sqlite3
 import threading
 import time
 import webbrowser
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
@@ -192,8 +192,52 @@ def db_import_legacy(schedules: list, presets: dict):
 
 
 # ---------------------------------------------------------------------------
+# Config DB Helpers
+# ---------------------------------------------------------------------------
+
+
+def db_get_all_config() -> dict:
+    conn = get_db()
+    rows = conn.execute('SELECT key, value FROM config').fetchall()
+    config = {row['key']: row['value'] for row in rows}
+    conn.close()
+    return config
+
+
+def db_set_config(key: str, value: str):
+    conn = get_db()
+    conn.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?,?)', (key, str(value)))
+    conn.commit()
+    conn.close()
+
+
+def db_set_config_many(pairs: dict):
+    conn = get_db()
+    for key, value in pairs.items():
+        conn.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?,?)', (key, str(value)))
+    conn.commit()
+    conn.close()
+
+
+def db_clear_config():
+    conn = get_db()
+    conn.execute('DELETE FROM config')
+    conn.commit()
+    conn.close()
+
+
+def db_get_ntp_logs(limit=50):
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute('SELECT * FROM ntp_logs ORDER BY id DESC LIMIT ?', (limit,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
 # NTP Manager
 # ---------------------------------------------------------------------------
+
 
 class NTPManager:
     def __init__(self):
@@ -273,6 +317,7 @@ app.add_middleware(
 
 # Static directory
 BASE_DIR = Path(__file__).parent
+BACKUP_DIR = BASE_DIR / "backups"
 static_dir = BASE_DIR / "static"
 static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
@@ -310,6 +355,24 @@ class PresetCreate(BaseModel):
 @app.on_event("startup")
 def startup():
     init_db()
+    # Auto-backup on server start
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    today = date.today().isoformat()
+    backup_path = os.path.join(BACKUP_DIR, f'vcc_pre_{today}.json')
+    if not os.path.exists(backup_path):
+        try:
+            data = {
+                'version': '0.6',
+                'exported_at': datetime.utcnow().isoformat(),
+                'schedules': db_get_schedules(),
+                'presets': [{**p, 'nodes_json': json.dumps(p.get('nodes', []))} for p in db_get_presets()],
+                'config': db_get_all_config()
+            }
+            with open(backup_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            print(f"📦 Auto-backup saved: {backup_path}")
+        except Exception as e:
+            print(f"⚠️ Auto-backup failed: {e}")
 
 
 INDEX_HTML = BASE_DIR / "templates" / "index.html"
@@ -334,6 +397,84 @@ async def ntp_sync():
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "db": str(DB_PATH.exists())}
+
+
+# ---------------------------------------------------------------------------
+# Config CRUD
+# ---------------------------------------------------------------------------
+
+
+@app.get('/api/config')
+def get_config():
+    """Return all config as a flat JSON object."""
+    config = db_get_all_config()
+    defaults = {
+        'frameRate': '25',
+        'timezone': 'Asia/Hong_Kong',
+        'beepFreq': '1500',
+        'beepDur': '0.5',
+        'retentionSeconds': '5',
+        'ntpServerUrl': 'time.hko.hk',
+        'ntpAutoSyncInterval': '600',
+        'ntpLastOffset': '0',
+        'ntpLastSyncTime': '',
+        'lastSelectedDate': '',
+    }
+    for k, v in defaults.items():
+        if k not in config:
+            config[k] = v
+    return config
+
+
+@app.put('/api/config')
+def update_config(data: dict):
+    """Update config (partial merge). Accepts flat JSON object."""
+    db_set_config_many(data)
+    return db_get_all_config()
+
+
+# ---------------------------------------------------------------------------
+# Backup / Restore
+# ---------------------------------------------------------------------------
+
+
+@app.get('/api/backup/download')
+def download_backup():
+    schedules = db_get_schedules()
+    presets = db_get_presets()
+    config = db_get_all_config()
+    ntp_logs = db_get_ntp_logs()
+    backup = {
+        'version': '0.6',
+        'exported_at': datetime.utcnow().isoformat(),
+        'schedules': schedules,
+        'presets': presets,
+        'config': config,
+        'ntp_logs': ntp_logs
+    }
+    return JSONResponse(
+        content=backup,
+        headers={'Content-Disposition': 'attachment; filename="vcc_pre_backup.json"'}
+    )
+
+
+@app.post('/api/backup/restore')
+async def restore_backup(file: UploadFile):
+    content = await file.read()
+    data = json.loads(content)
+    # Clear existing
+    conn = get_db()
+    conn.execute('DELETE FROM schedules')
+    conn.execute('DELETE FROM presets')
+    conn.execute('DELETE FROM config')
+    conn.commit()
+    conn.close()
+    # Import
+    db_import_legacy(data.get('schedules', []),
+                     {p['id']: p for p in data.get('presets', [])})
+    if 'config' in data:
+        db_set_config_many(data['config'])
+    return {'status': 'ok', 'schedules': len(data.get('schedules', [])), 'presets': len(data.get('presets', []))}
 
 
 # ---------------------------------------------------------------------------
