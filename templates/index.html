@@ -1061,6 +1061,24 @@
                                style="width:80px; background:#090d16; border:1px solid #374151; color:#fff; padding:4px 8px; border-radius:3px; font-size:11px;">
                         <button class="btn-ctrl btn-export-ui" onclick="clipperConnect()" style="padding:3px 10px; font-size:10px;">🔗 連線</button>
                     </div>
+
+                    <!-- 檔案傳輸區 (依 Clipper 規範) -->
+                    <div style="margin-top:12px; padding-top:12px; border-top:1px solid #1f2937;">
+                        <div style="font-size:12px; color:#64748b; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                            <span>📁 檔案傳輸</span>
+                            <span style="flex:1;"></span>
+                            <span id="clipperFileStatus" style="font-size:10px;">0 / 0 個檔案完成</span>
+                        </div>
+                        <div id="clipperFileDropZone" style="border:2px dashed #374151; border-radius:8px; padding:20px; text-align:center; cursor:pointer; transition:all 0.2s; background:#090d16;"
+                             ondragover="event.preventDefault();this.style.borderColor='#38bdf8';this.style.background='rgba(56,189,248,0.04)';"
+                             ondragleave="this.style.borderColor='#374151';this.style.background='#090d16';"
+                             ondrop="event.preventDefault();this.style.borderColor='#374151';this.style.background='#090d16';clipperHandleDrop(event.dataTransfer.files);">
+                            <div style="font-size:28px; margin-bottom:6px;">📁</div>
+                            <div style="font-size:13px; color:#9ca3af;">拖曳檔案至此處，或點擊選擇檔案</div>
+                            <input type="file" id="clipperFileInput" multiple style="display:none;" onchange="clipperHandleDrop(this.files)">
+                        </div>
+                        <div id="clipperFileRecvStatus" style="font-size:11px; color:#64748b; margin-top:4px;"></div>
+                    </div>
                 </div>
             </div>
 
@@ -4334,6 +4352,54 @@
             case 'error':
                 appendClipperMsg('system', '⚠️ 伺服器錯誤: ' + (data.message || data.error || '未知錯誤'));
                 break;
+
+            case 'file-meta':
+                // Incoming file metadata — prepare to receive
+                clipperFileReceives[data.fileId] = {
+                    name: data.name, size: data.size, chunks: data.chunks || 0,
+                    received: 0, blobs: [], chunkCount: 0, status: 'receiving',
+                    fromPeer: data.from || '?'
+                };
+                appendClipperMsg('system', '📁 正在接收檔案: ' + data.name + ' (' + Math.round(data.size/1024) + 'KB)');
+                document.getElementById('clipperFileRecvStatus').innerHTML = '📥 接收中: ' + data.name + ' <span style="color:#38bdf8;">0%</span>';
+                break;
+
+            case 'relay-chunk':
+                // Incoming file chunk via WS relay (base64)
+                {
+                    const fileId = data.fileId;
+                    const entry = clipperFileReceives[fileId];
+                    if (!entry || entry.status === 'cancelled') break;
+                    const binaryStr = atob(data.chunk);
+                    const bytes = new Uint8Array(binaryStr.length);
+                    for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+                    entry.blobs.push(bytes.buffer);
+                    entry.received += bytes.length;
+                    entry.chunkCount++;
+                    if (entry.chunks > 0) {
+                        var pct = Math.min(99, Math.round((entry.chunkCount / entry.chunks) * 100));
+                        document.getElementById('clipperFileRecvStatus').innerHTML = '📥 接收中: ' + entry.name + ' <span style="color:#38bdf8;">' + pct + '%</span>';
+                    }
+                }
+                break;
+
+            case 'file-done':
+                // File transfer complete — assemble and download
+                {
+                    const entry = clipperFileReceives[data.fileId];
+                    if (!entry || entry.status === 'cancelled') break;
+                    entry.status = 'done';
+                    document.getElementById('clipperFileRecvStatus').innerHTML = '✅ 接收完成: ' + entry.name;
+                    const blob = new Blob(entry.blobs, {type: 'application/octet-stream'});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = entry.name;
+                    document.body.appendChild(a); a.click(); a.remove();
+                    setTimeout(function() { URL.revokeObjectURL(url); }, 10000);
+                    appendClipperMsg('system', '✅ 檔案已接收並下載: ' + entry.name);
+                    delete clipperFileReceives[data.fileId];
+                }
+                break;
                 
             default:
                 // Unknown message type, ignore
@@ -4435,6 +4501,99 @@
             if (t) { t.style.transition = 'opacity 0.3s'; t.style.opacity = '0'; }
             setTimeout(function() { if (t && t.parentNode) t.remove(); }, 350);
         }, 5000);
+    }
+
+    // ===== Clipper File Transfer (依 Clipper 規範：WS Relay 中繼) =====
+    var clipperFileReceives = {};
+    var clipperFileSending = {};
+    var clipperFileQueue = [];
+    var clipperFileSendingActive = false;
+
+    function clipperHandleDrop(fileList) {
+        if (!clipperConnected || !clipperWs) { appendClipperMsg('system', '⚠️ 請先連線至 Clipper 伺服器'); return; }
+        for (var fi = 0; fi < fileList.length; fi++) {
+            var file = fileList[fi];
+            clipperFileQueue.push({
+                file: file, fileId: crypto.randomUUID ? crypto.randomUUID().slice(0,8) : 'f' + Date.now(),
+                name: file.name, size: file.size, progress: 0, status: 'pending'
+            });
+        }
+        updateClipperFileUI();
+        if (!clipperFileSendingActive) clipperSendNextFile();
+    }
+
+    function clipperSendNextFile() {
+        if (clipperFileQueue.length === 0) { clipperFileSendingActive = false; updateClipperFileUI(); return; }
+        var entry = null;
+        for (var qi = 0; qi < clipperFileQueue.length; qi++) {
+            if (clipperFileQueue[qi].status === 'pending') { entry = clipperFileQueue[qi]; break; }
+        }
+        if (!entry) { clipperFileSendingActive = false; updateClipperFileUI(); return; }
+        clipperFileSendingActive = true;
+        entry.status = 'sending';
+        updateClipperFileUI();
+        clipperSendFileToPeer(entry);
+    }
+
+    async function clipperSendFileToPeer(entry) {
+        var fileId = entry.fileId;
+        clipperFileSending[fileId] = { name: entry.name, size: entry.size, progress: 0, status: 'sending' };
+        updateClipperFileUI();
+        try {
+            var buffer = await entry.file.arrayBuffer();
+            var CHUNK_SIZE = 65536;
+            var totalChunks = Math.ceil(buffer.byteLength / CHUNK_SIZE);
+            // Send file-meta
+            clipperWs.send(JSON.stringify({
+                type: 'file-meta', fileId: fileId, name: entry.name, size: entry.size, chunks: totalChunks,
+                from: document.getElementById('clipperDisplayName').textContent
+            }));
+            appendClipperMsg('system', '📤 正在傳送: ' + entry.name + ' (' + Math.round(entry.size/1024) + 'KB, ' + totalChunks + ' chunks)');
+            // Send chunks via WS relay (base64)
+            for (var ci = 0; ci < totalChunks; ci++) {
+                var start = ci * CHUNK_SIZE;
+                var end = Math.min(start + CHUNK_SIZE, buffer.byteLength);
+                var chunk = buffer.slice(start, end);
+                var chunkBase64 = arrayBufferToBase64(chunk);
+                clipperWs.send(JSON.stringify({
+                    type: 'relay-chunk', room: document.getElementById('clipperRoomCode').value.trim(),
+                    to: '', fileId: fileId, chunk: chunkBase64, index: ci, total: totalChunks
+                }));
+                if (clipperFileSending[fileId]) clipperFileSending[fileId].progress = Math.round(((ci + 1) / totalChunks) * 100);
+                updateClipperFileUI();
+                // Small delay to avoid flooding
+                await new Promise(function(r) { setTimeout(r, 5); });
+            }
+            // Send file-done
+            clipperWs.send(JSON.stringify({ type: 'file-done', fileId: fileId }));
+            if (clipperFileSending[fileId]) clipperFileSending[fileId].status = 'done';
+            appendClipperMsg('system', '✅ 傳送完成: ' + entry.name);
+        } catch(err) {
+            appendClipperMsg('system', '❌ 傳送失敗: ' + entry.name + ' — ' + err.message);
+            if (clipperFileSending[fileId]) clipperFileSending[fileId].status = 'error';
+        }
+        delete clipperFileSending[fileId];
+        entry.status = 'done';
+        clipperFileQueue = clipperFileQueue.filter(function(f) { return f.fileId !== entry.fileId; });
+        updateClipperFileUI();
+        clipperSendNextFile();
+    }
+
+    function arrayBufferToBase64(buffer) {
+        var bytes = new Uint8Array(buffer);
+        var binary = '';
+        for (var bi = 0; bi < bytes.length; bi++) binary += String.fromCharCode(bytes[bi]);
+        return btoa(binary);
+    }
+
+    function updateClipperFileUI() {
+        var done = 0;
+        for (var fi = 0; fi < clipperFileQueue.length; fi++) { if (clipperFileQueue[fi].status === 'done') done++; }
+        var statusEl = document.getElementById('clipperFileStatus');
+        if (statusEl) statusEl.textContent = done + ' / ' + (done + clipperFileQueue.length) + ' 個檔案完成';
+        // Update drop zone click
+        var dz = document.getElementById('clipperFileDropZone');
+        if (dz) dz.onclick = function() { document.getElementById('clipperFileInput').click(); };
     }
 
     function updateClipperStatus(state, label) {
