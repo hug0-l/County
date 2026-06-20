@@ -16,7 +16,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, UploadFile, Query
+from fastapi import FastAPI, Request, UploadFile, Query
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, PlainTextResponse
@@ -34,6 +34,9 @@ LOGS_DIR.mkdir(exist_ok=True)
 def _current_log_path() -> Path:
     return LOGS_DIR / f"county_{date.today().isoformat()}.log"
 
+
+# Client log file (dedicated file, collected from frontend)
+CLIENT_LOG_FILE = LOGS_DIR / "client_logs.log"
 
 
 def _append_log(level: str, msg: str):
@@ -55,12 +58,27 @@ def log_warn(msg: str):    _append_log("WARN", msg)
 def log_error(msg: str):   _append_log("ERROR", msg)
 
 
+def db_append_client_log(entries: list):
+    """Append client log entries to a dedicated log file + print to stderr."""
+    for entry in entries:
+        ts = entry.get('ts', datetime.utcnow().isoformat())
+        level = entry.get('level', 'INFO').upper()
+        msg = entry.get('msg', '')
+        line = f"[{ts}] [CLIENT-{level}] {msg}"
+        print(line, file=sys.stderr)
+        try:
+            with open(CLIENT_LOG_FILE, 'a', encoding='utf-8') as f:
+                f.write(line + '\n')
+        except Exception:
+            pass
+
+
 # Clean up log files older than 24 hours
 def _clean_old_logs():
     now = time.time()
     cutoff = now - 86400
     for f in LOGS_DIR.iterdir():
-        if f.name.startswith("county_") and f.suffix == ".log" and f.stat().st_mtime < cutoff:
+        if f.suffix == ".log" and f.stat().st_mtime < cutoff:
             try:
                 f.unlink()
                 _append_log("INFO", f"🧹 Removed old log: {f.name}")
@@ -707,6 +725,21 @@ async def import_legacy(data: LegacyImport):
 # ---------------------------------------------------------------------------
 # Log API
 # ---------------------------------------------------------------------------
+
+
+@app.post("/api/log/client")
+async def receive_client_log(request: Request):
+    """Receive batch client log entries from the frontend."""
+    try:
+        data = await request.json()
+        entries = data if isinstance(data, list) else data.get('entries', [])
+        if not entries:
+            return {"status": "ok", "count": 0}
+        db_append_client_log(entries)
+        return {"status": "ok", "count": len(entries)}
+    except Exception as e:
+        log_error(f"Failed to receive client logs: {e}")
+        return JSONResponse(status_code=400, content={"error": str(e)})
 
 
 @app.get("/api/log/recent")

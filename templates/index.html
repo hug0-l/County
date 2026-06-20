@@ -1735,6 +1735,28 @@
     const CLIENT_LOG_MAX = 1000;   // max lines in buffer
     const CLIENT_LOG_TRIM = 500;   // trim to this many when full
 
+    // Client log upload buffer — auto-uploaded to server every 30s
+    var _clientLogUploadBuffer = [];
+    var CLIENT_LOG_UPLOAD_INTERVAL = 30000; // 30s
+
+    // Fire-and-forget upload timer for client logs
+    setInterval(function() {
+        if (_clientLogUploadBuffer.length === 0) return;
+        var batch = _clientLogUploadBuffer.splice(0, _clientLogUploadBuffer.length);
+        var body = JSON.stringify(batch);
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/log/client', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send(body);
+        xhr.onerror = function() {
+            // On failure, push back to buffer (prepend to avoid infinite loop)
+            _clientLogUploadBuffer = batch.concat(_clientLogUploadBuffer);
+            if (_clientLogUploadBuffer.length > 5000) {
+                _clientLogUploadBuffer = _clientLogUploadBuffer.slice(-5000);
+            }
+        };
+    }, CLIENT_LOG_UPLOAD_INTERVAL);
+
     function writeLog(message, type = 'info') {
         // --- In-memory console display ---
         const consoleEl = document.getElementById('consoleTerminal');
@@ -1758,6 +1780,9 @@
 
         // --- Persistent log buffer (localStorage, auto-prune 24h) ---
         persistClientLog(now.toISOString(), type, message);
+
+        // Push to upload buffer for server sync (fire-and-forget, batched every 30s)
+        _clientLogUploadBuffer.push({ts: now.toISOString(), level: type, msg: message});
     }
 
     function persistClientLog(isoTimestamp, type, message) {
