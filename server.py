@@ -458,9 +458,83 @@ def _ntp_auto_sync_loop():
             log_error(f"⚠️ NTP auto-sync error: {e}")
 
 
+
 # ---------------------------------------------------------------------------
-# Routes
+# Validation Helpers
 # ---------------------------------------------------------------------------
+
+
+def _validate_timecode(tc: str) -> bool:
+    """Validate timecode format HH:MM:SS:FF. Hours 0-23, frames 0-24 (PAL 25fps)."""
+    import re
+    if not re.match(r'^\d{2}:\d{2}:\d{2}:\d{2}$', tc):
+        return False
+    parts = tc.split(':')
+    h, m, s, f = int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3])
+    return 0 <= h <= 23 and 0 <= m <= 59 and 0 <= s <= 59 and 0 <= f <= 24
+
+def _tc_to_seconds(tc: str) -> float:
+    """Convert HH:MM:SS:FF to total seconds (approximate, 25fps)."""
+    parts = tc.split(':')
+    h, m, s, f = int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3])
+    return h * 3600 + m * 60 + s + f / 25.0
+
+
+def _normalize_schedule_keys(d: dict) -> dict:
+    """Convert camelCase schedule keys to snake_case for internal comparison."""
+    mapping = {
+        'broadcastDate': 'broadcast_date',
+        'startTime': 'start_time',
+        'periodicEndDate': 'periodic_end_date',
+        'periodicType': 'periodic_type',
+        'periodicDays': 'periodic_days',
+        'presetId': 'preset_id',
+        'colorLabel': 'color_label',
+    }
+    result = dict(d)
+    for camel, snake in mapping.items():
+        if camel in result and snake not in result:
+            result[snake] = result[camel]
+    return result
+
+
+def _has_time_overlap(a: dict, b: dict) -> bool:
+    """Check if two schedule entries overlap in time (same date + overlapping intervals)."""
+    a = _normalize_schedule_keys(a)
+    b = _normalize_schedule_keys(b)
+    if a.get('broadcast_date') != b.get('broadcast_date'):
+        return False
+    a_start = _tc_to_seconds(a.get('start_time', '00:00:00:00'))
+    a_end = a_start + _tc_to_seconds(a.get('duration', '00:00:00:00'))
+    b_start = _tc_to_seconds(b.get('start_time', '00:00:00:00'))
+    b_end = b_start + _tc_to_seconds(b.get('duration', '00:00:00:00'))
+    return a_start < b_end and b_start < a_end
+
+
+def _find_schedule_conflicts(schedule: dict) -> list:
+    """Find existing schedules that overlap with the given schedule (excluding itself)."""
+    s = _normalize_schedule_keys(schedule)
+    conn = get_db()
+    rows = conn.execute(
+        'SELECT * FROM schedules WHERE broadcast_date=?',
+        (s.get('broadcast_date', ''),)
+    ).fetchall()
+    conn.close()
+    conflicts = []
+    for row in rows:
+        other = dict(row)
+        if other['id'] == s.get('id'):
+            continue
+        other['tags'] = json.loads(other.get('tags', '[]'))
+        other['periodicDays'] = json.loads(other.get('periodic_days', '[]'))
+        if _has_time_overlap(s, other):
+            conflicts.append({
+                'id': other['id'],
+                'name': other['name'],
+                'startTime': other['start_time'],
+                'duration': other.get('duration', '')
+            })
+    return conflicts
 
 @app.on_event("startup")
 def startup():
@@ -529,6 +603,68 @@ async def ntp_sync():
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "db": str(DB_PATH.exists())}
+
+
+@app.post("/api/schedule/validate")
+async def validate_schedule(data: dict):
+    """Validate schedule data completeness and correctness."""
+    errors = []
+    # Timecode format check
+    start_time = data.get('startTime', '')
+    duration = data.get('duration', '')
+    if not _validate_timecode(start_time):
+        errors.append(f"無效的開始時間格式: {start_time}")
+    if not _validate_timecode(duration):
+        errors.append(f"無效的長度格式: {duration}")
+    elif _tc_to_seconds(duration) <= 0:
+        errors.append("長度必須大於 0")
+    # Date range check
+    periodic_type = data.get('periodicType', 'none')
+    periodic_end = data.get('periodicEndDate', '')
+    broadcast_date = data.get('broadcastDate', '')
+    if periodic_type != 'none' and periodic_end:
+        if periodic_end < broadcast_date:
+            errors.append("週期終止日不能早於開始日")
+    # Periodic consistency: custom type needs periodicDays
+    if periodic_type == 'custom':
+        days = data.get('periodicDays', [])
+        if not days or not isinstance(days, list) or len(days) == 0:
+            errors.append("自訂週期類型需要至少一個週期日")
+    return {"valid": len(errors) == 0, "errors": errors}
+
+
+@app.post("/api/preset/validate")
+async def validate_preset(data: dict):
+    """Validate preset data completeness and correctness."""
+    errors = []
+    # id and name must not be empty
+    pid = data.get('id', '')
+    name = data.get('name', '')
+    if not pid:
+        errors.append("Preset ID 不可為空")
+    if not name:
+        errors.append("Preset name 不可為空")
+    # nodes must be an array
+    nodes = data.get('nodes')
+    if nodes is None:
+        errors.append("nodes 必須是陣列")
+    elif not isinstance(nodes, list):
+        errors.append("nodes 必須是陣列")
+    else:
+        for i, node in enumerate(nodes):
+            if not isinstance(node, dict):
+                errors.append(f"節點 {i} 必須是物件")
+                continue
+            if 'nodeName' not in node or not node.get('nodeName'):
+                errors.append(f"節點 {i} 缺少 nodeName")
+            if 'offsetType' not in node:
+                errors.append(f"節點 {i} 缺少 offsetType")
+            if 'offsetSec' not in node:
+                errors.append(f"節點 {i} 缺少 offsetSec")
+            elif not isinstance(node.get('offsetSec'), (int, float)) or node['offsetSec'] < 0:
+                errors.append(f"節點 {i} 的 offsetSec 必須 >= 0")
+    return {"valid": len(errors) == 0, "errors": errors}
+
 
 
 # ---------------------------------------------------------------------------
@@ -653,9 +789,16 @@ async def update_schedule(schedule_id: str, data: ScheduleCreate):
 
     doc = data.model_dump()
     doc['id'] = schedule_id
-    return db_upsert_schedule(doc)
+    saved = db_upsert_schedule(doc)
 
+    # Conflict detection: check for overlapping schedules on the same date
+    conflicts = _find_schedule_conflicts(doc)
+    result = dict(saved)
+    if conflicts:
+        result['conflicts'] = conflicts
+    return result
 
+ 
 @app.delete("/api/schedule/{schedule_id}")
 async def delete_schedule(schedule_id: str):
     if db_delete_schedule(schedule_id):
