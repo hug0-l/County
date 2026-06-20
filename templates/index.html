@@ -1464,7 +1464,7 @@
             badge.innerText = '🕒 NTP 已同步 (' + sign + offsetMs + 'ms)';
             if (ntpStatusEl) {
                 const url = NTPManager.config.ntpServerUrl;
-                const timeStr = lastSync ? new Date(lastSync).toLocaleTimeString() : '';
+                const timeStr = formatTimeInAppTz(lastSync, 'time');
                 ntpStatusEl.innerText = '來源: ' + url + ' | 最後同步: ' + timeStr;
             }
         } else if (status === 'fallback') {
@@ -1486,6 +1486,18 @@
     }
 
     // --- Timecode 核心轉換引擎（支援動態 FPS） ---
+    // 根據 appConfig 時區格式化時間字串，供用戶端顯示
+    function formatTimeInAppTz(isoStr, style) {
+        if (!isoStr) return '—';
+        const tz = (appConfig && appConfig.timezone) ? appConfig.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone;
+        try {
+            const d = new Date(isoStr);
+            if (style === 'time') return d.toLocaleTimeString('zh-HK', { timeZone: tz, hour12: false });
+            if (style === 'datetime') return d.toLocaleString('zh-HK', { timeZone: tz, hour12: false });
+            return d.toLocaleString('zh-HK', { timeZone: tz });
+        } catch(e) { return isoStr; }
+    }
+
     function dateToTimecode(d) {
         let hh = String(d.getHours()).padStart(2, '0');
         let mm = String(d.getMinutes()).padStart(2, '0');
@@ -2798,7 +2810,7 @@
             statusEl.innerHTML += '<br><span style="font-size:11px; color:#ef4444;">' + NTPManager.errorMsg + '</span>';
         }
         if (lastSyncEl) {
-            lastSyncEl.innerText = NTPManager.lastSyncTime ? new Date(NTPManager.lastSyncTime).toLocaleString() : '—';
+            lastSyncEl.innerText = formatTimeInAppTz(NTPManager.lastSyncTime, 'datetime');
         }
     }
 
