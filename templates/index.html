@@ -7,6 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>County 廣播主控室操作員系統 v0.5</title>
+    <link rel="stylesheet" href="/static/county.css">
     <style>
         body {
             margin: 0;
@@ -1139,6 +1140,21 @@
                     </style>
                 </div>
 <script src="/static/clipper-sdk.js"></script>
+<script src="/static/county-core.js"></script>
+<!-- 後續模組將插入此處 -->
+<script src="/static/county-helpers.js"></script>
+<script src="/static/county-config.js"></script>
+<script src="/static/county-api.js"></script>
+<script src="/static/county-log.js"></script>
+<script src="/static/county-time.js"></script>
+<script src="/static/county-data.js"></script>
+<script src="/static/county-sound.js"></script>
+<script src="/static/county-engine.js"></script>
+<script src="/static/county-ui-live.js"></script>
+<script src="/static/county-ui-rundown.js"></script>
+<script src="/static/county-ui-preset.js"></script>
+<script src="/static/county-ui-settings.js"></script>
+<script src="/static/county-ui-clipper.js"></script>
 <script>
     // ============================================================================
     // County — 廣播排控自動化系統 v0.5
@@ -4729,6 +4745,9 @@
         }
     });
     function factoryResetStorage() { if (confirm("確定工廠重置？")) { localStorage.clear(); location.reload(); } }
+
+    // County 模組初始化
+    County.init();
 </script>
 <div id="timelineTooltip" style="display:none; position:fixed; z-index:9999; background:#1e293b; color:#f1f5f9; padding:8px 12px; border-radius:6px; font-size:12px; font-family:monospace; border:1px solid #475569; box-shadow:0 4px 16px rgba(0,0,0,0.5); pointer-events:none; white-space:nowrap;"></div>
 </body>
