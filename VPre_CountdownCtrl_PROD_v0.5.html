@@ -1124,6 +1124,62 @@
     let progColorMap = {};           // 節目 → 顏色索引
     let lastNearestIdx = -1;         // 矩陣自動對齊鎖（避免每幀搶奪滾動）
     const MATRIX_COLORS = ['#ef4444','#f59e0b','#10b981','#3b82f6','#8b5cf6','#ec4899','#06b6d4','#f97316'];
+    // NTP 時間服務管理器
+    const NTPManager = {
+        status: 'local',        // 'connected' | 'fallback' | 'local' | 'syncing' | 'error'
+        offset: 0,              // milliseconds (serverTime - localTime)
+        lastSyncTime: null,     // ISO string or null
+        errorMsg: '',
+        config: {
+            ntpServerUrl: 'https://worldtimeapi.org/api/timezone/Asia/Hong_Kong',
+            ntpAutoSyncInterval: 0,   // seconds, 0=disabled
+        },
+        timerId: null,          // auto-sync interval ID
+
+        // Core sync: fetch URL, parse time, compute offset
+        async sync(url) {
+            this.status = 'syncing';
+            updateNtpStatusUI();
+            url = url || this.config.ntpServerUrl;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            try {
+                const res = await fetch(url, { signal: controller.signal });
+                const data = await res.json();
+                let serverEpoch = 0;
+                if (data.datetime) {
+                    serverEpoch = new Date(data.datetime).getTime();
+                } else if (data.utc_datetime) {
+                    serverEpoch = new Date(data.utc_datetime).getTime();
+                } else if (data.unixtime) {
+                    serverEpoch = parseInt(data.unixtime) * 1000;
+                }
+                if (!serverEpoch) throw new Error('無法解析伺服器時間');
+                this.offset = serverEpoch - Date.now();
+                this.lastSyncTime = new Date().toISOString();
+                timeOffset = this.offset;
+                this.status = 'connected';
+                this.errorMsg = '';
+                // Persist
+                localStorage.setItem('vcc_pre_ntp_offset', String(this.offset));
+                localStorage.setItem('vcc_pre_ntp_last_sync', this.lastSyncTime);
+                appConfig.ntpLastOffset = this.offset;
+                appConfig.ntpLastSyncTime = this.lastSyncTime;
+                saveConfig();
+            } catch(err) {
+                if (err.name === 'AbortError') {
+                    this.errorMsg = '連線超時 (5s)';
+                } else {
+                    this.errorMsg = err.message || '同步失敗';
+                }
+                // 保留上一次成功的 offset，不改動 timeOffset
+                this.status = this.offset !== 0 ? 'fallback' : 'local';
+            } finally {
+                clearTimeout(timeoutId);
+                updateNtpStatusUI();
+            }
+        }
+    };
 
     // GUI 行事曆目前的月/年檢視狀態
     let calCurrentYear = new Date().getFullYear(); let calCurrentMonth = new Date().getMonth(); // 從今日初始化
@@ -1139,6 +1195,10 @@
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Hong_Kong',
             lastSelectedDate: new Date().toISOString().split('T')[0],
             retentionSeconds: 5,
+            ntpServerUrl: localStorage.getItem('vcc_pre_ntp_server_url') || 'https://worldtimeapi.org/api/timezone/Asia/Hong_Kong',
+            ntpAutoSyncInterval: parseInt(localStorage.getItem('vcc_pre_ntp_interval') || '0'),
+            ntpLastOffset: parseInt(localStorage.getItem('vcc_pre_ntp_offset') || '0'),
+            ntpLastSyncTime: localStorage.getItem('vcc_pre_ntp_last_sync') || '',
             version: 3
         };
     }
@@ -1155,6 +1215,10 @@
         appConfig.timezone = document.getElementById('cfgTimezone').value;
         appConfig.retentionSeconds = parseInt(document.getElementById('cfgRetentionSec').value) || 5;
         appConfig.lastSelectedDate = document.getElementById('globalTargetDate').value;
+        appConfig.ntpServerUrl = NTPManager.config.ntpServerUrl;
+        appConfig.ntpAutoSyncInterval = NTPManager.config.ntpAutoSyncInterval;
+        appConfig.ntpLastOffset = NTPManager.offset;
+        appConfig.ntpLastSyncTime = NTPManager.lastSyncTime || '';
         localStorage.setItem('vcc_pre_config_v8', JSON.stringify(appConfig));
         markDirty();
     }
@@ -1179,6 +1243,62 @@
         timelineRange.maxFrames = 86400 * frameRate;
         const fpsLabel = document.getElementById('sidebarFpsLabel');
         if (fpsLabel) fpsLabel.innerText = frameRate + ' fps';
+
+        // 載入 NTP 設定
+        const storedUrl = appConfig.ntpServerUrl || localStorage.getItem('vcc_pre_ntp_server_url') || 'https://worldtimeapi.org/api/timezone/Asia/Hong_Kong';
+        const storedInterval = appConfig.ntpAutoSyncInterval || parseInt(localStorage.getItem('vcc_pre_ntp_interval') || '0');
+        const storedOffset = appConfig.ntpLastOffset || parseInt(localStorage.getItem('vcc_pre_ntp_offset') || '0');
+        const storedSyncTime = appConfig.ntpLastSyncTime || localStorage.getItem('vcc_pre_ntp_last_sync') || '';
+        NTPManager.config.ntpServerUrl = storedUrl;
+        NTPManager.config.ntpAutoSyncInterval = storedInterval;
+        NTPManager.offset = storedOffset;
+        NTPManager.lastSyncTime = storedSyncTime;
+        if (storedOffset) {
+            timeOffset = storedOffset;
+            NTPManager.status = 'fallback';
+        }
+    }
+
+    function updateNtpStatusUI() {
+        const badge = document.getElementById('syncBadge');
+        const ntpStatusEl = document.getElementById('ntpStatus');
+        if (!badge) return;
+
+        const status = NTPManager.status;
+        const offset = NTPManager.offset;
+        const lastSync = NTPManager.lastSyncTime;
+        const errorMsg = NTPManager.errorMsg;
+
+        if (status === 'syncing') {
+            badge.className = 'sync-badge sync-loading';
+            badge.innerText = '🔄 NTP 同步中…';
+            if (ntpStatusEl) ntpStatusEl.innerText = '';
+        } else if (status === 'connected') {
+            badge.className = 'sync-badge sync-success';
+            const offsetMs = Math.round(offset);
+            const sign = offsetMs >= 0 ? '+' : '';
+            badge.innerText = '🕒 NTP 已同步 (' + sign + offsetMs + 'ms)';
+            if (ntpStatusEl) {
+                const url = NTPManager.config.ntpServerUrl;
+                const timeStr = lastSync ? new Date(lastSync).toLocaleTimeString() : '';
+                ntpStatusEl.innerText = '來源: ' + url + ' | 最後同步: ' + timeStr;
+            }
+        } else if (status === 'fallback') {
+            badge.className = 'sync-badge sync-success';
+            const offsetMs = Math.round(offset);
+            badge.innerText = '🖥️ 本地時鐘 (保留偏移 ' + (offsetMs >= 0 ? '+' : '') + offsetMs + 'ms)';
+            if (ntpStatusEl) {
+                ntpStatusEl.innerText = '⚠️ NTP 同步失敗 — ' + errorMsg;
+            }
+        } else if (status === 'error') {
+            badge.className = 'sync-badge sync-success';
+            badge.innerText = '🖥️ 本地時鐘';
+            if (ntpStatusEl) ntpStatusEl.innerText = '⚠️ NTP 錯誤 — ' + errorMsg;
+        } else { // local
+            badge.className = 'sync-badge sync-success';
+            badge.innerText = '🖥️ 本地時鐘';
+            if (ntpStatusEl) ntpStatusEl.innerText = '';
+        }
     }
 
     // --- Timecode 核心轉換引擎（支援動態 FPS） ---
@@ -2242,29 +2362,24 @@
     }
 
     function syncWithNetworkTime(callback) {
-        const badge = document.getElementById('syncBadge');
-        const ntpStatusEl = document.getElementById('ntpStatus');
-        timeOffset = 1; // 強制使用本地時鐘
-        if (badge) {
-            badge.className = "sync-badge sync-success"; badge.innerText = "🖥️ 本地系統時鐘";
+        const storedOffset = parseInt(localStorage.getItem('vcc_pre_ntp_offset') || '0');
+        const storedSyncTime = localStorage.getItem('vcc_pre_ntp_last_sync') || '';
+        if (storedOffset) {
+            timeOffset = storedOffset;
+            NTPManager.offset = storedOffset;
+            NTPManager.lastSyncTime = storedSyncTime;
+            NTPManager.status = storedOffset !== 0 ? 'fallback' : 'local';
         }
-        if (callback) callback();
+        // 嘗試同步
+        NTPManager.sync(NTPManager.config.ntpServerUrl).finally(function() {
+            if (callback) callback();
+        });
     }
 
     function checkNtpStatus() {
-        const ntpStatusEl = document.getElementById('ntpStatus');
-        const settingsNtpEl = document.getElementById('settingsNtpStatus');
-        if (settingsNtpEl) settingsNtpEl.innerText = "🔄 檢查中...";
-        fetch('https://worldtimeapi.org/api/timezone/Asia/Hong_Kong')
-            .then(function(res) { return res.json(); })
-            .then(function() {
-                if (ntpStatusEl) ntpStatusEl.innerText = "🟢 NTP 已連線";
-                if (settingsNtpEl) settingsNtpEl.innerText = "🟢 已連線 (worldtimeapi.org)";
-            })
-            .catch(function() {
-                if (ntpStatusEl) ntpStatusEl.innerText = "⚠️ 無法連線 NTP";
-                if (settingsNtpEl) settingsNtpEl.innerText = "⚠️ 連線失敗 — 請檢查網路或防火牆設定";
-            });
+        updateNtpStatusUI();
+        // One-shot sync attempt (non-blocking, just for status)
+        NTPManager.sync();
     }
 
     // ===== 自適應矩陣高度（填滿視窗剩餘空間） =====
