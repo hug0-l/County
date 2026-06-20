@@ -2102,6 +2102,13 @@ setTimeout(function() {
         // 自適應矩陣高度
         adjustMatrixHeight();
         window.addEventListener('resize', adjustMatrixHeight);
+
+        // 自動啟動主控監測（延遲確保 master timer 已啟用、資料已載入）
+        setTimeout(function() {
+            if (getExpandedRundownForDate(document.getElementById('globalTargetDate').value).length > 0) {
+                initGlobalTracking();
+            }
+        }, 200);
     };
 
     // =============================================
