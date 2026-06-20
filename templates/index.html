@@ -4274,28 +4274,54 @@
             return;
         }
         if (!files || files.length === 0) return;
+        
+        // 如果還沒有 peers，等待一下讓 peer-list 到達
+        if (clipper._peers.size === 0 && clipper._state && clipper._state.peers && clipper._state.peers.length > 1) {
+            // state.peers 包含了自己，過濾掉
+            const others = clipper._state.peers.filter(function(p) { return p.peerId !== clipper._peerId; });
+            if (others.length > 0) {
+                renderFileTargets(files, others);
+                return;
+            }
+        }
+        
         renderFileTargets(files);
     }
 
-    function renderFileTargets(files) {
+    function renderFileTargets(files, peerArray) {
         const container = document.getElementById('clipperFileTargets');
         container.innerHTML = '';
         container.style.display = '';
-        for (const [peerId, info] of clipper._peers) {
-            const btn = document.createElement('button');
-            btn.textContent = '📤 ' + (info.displayName || peerId);
+        
+        // 從 _peers Map 或傳入的 peerArray 取得目標
+        var targets = peerArray || [];
+        if (targets.length === 0) {
+            for (const [peerId, info] of clipper._peers) {
+                targets.push({ peerId: peerId, displayName: info.displayName || peerId });
+            }
+        }
+        
+        // Remove self from targets
+        targets = targets.filter(function(p) { return p.peerId !== clipper._peerId; });
+        
+        for (var i = 0; i < targets.length; i++) {
+            var peer = targets[i];
+            var btn = document.createElement('button');
+            btn.textContent = '📤 ' + (peer.displayName || peer.peerId);
             btn.style.cssText = 'padding:4px 10px; font-size:11px; background:#1e293b; border:1px solid #334155; color:#e2e8f0; border-radius:4px; cursor:pointer;';
-            btn.onclick = function() {
-                container.style.display = 'none';
-                for (const file of files) {
-                    clipper.sendFile(peerId, file);
-                }
-            };
+            (function(targetPeerId) {
+                btn.onclick = function() {
+                    container.style.display = 'none';
+                    for (var j = 0; j < files.length; j++) {
+                        clipper.sendFile(targetPeerId, files[j]);
+                    }
+                };
+            })(peer.peerId);
             container.appendChild(btn);
         }
-        // If no peers, show a message
-        if (clipper._peers.size === 0) {
-            const msg = document.createElement('div');
+        
+        if (targets.length === 0) {
+            var msg = document.createElement('div');
             msg.style.cssText = 'color:#64748b; font-size:12px; padding:8px 0;';
             msg.textContent = '⚠️ 尚無其他成員在房間內';
             container.appendChild(msg);
