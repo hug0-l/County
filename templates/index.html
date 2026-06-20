@@ -1241,9 +1241,6 @@
                     this.lastSyncTime = result.last_sync;
                     this.errorMsg = '';
                     timeOffset = this.offset;
-                    // Persist locally too
-                    localStorage.setItem('vcc_pre_ntp_offset', String(this.offset));
-                    localStorage.setItem('vcc_pre_ntp_last_sync', this.lastSyncTime);
                     appConfig.ntpLastOffset = this.offset;
                     appConfig.ntpLastSyncTime = this.lastSyncTime;
                     saveConfig();
@@ -1357,10 +1354,10 @@
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Hong_Kong',
             lastSelectedDate: new Date().toISOString().split('T')[0],
             retentionSeconds: 5,
-            ntpServerUrl: localStorage.getItem('vcc_pre_ntp_server_url') || 'https://worldtimeapi.org/api/timezone/Asia/Hong_Kong',
-            ntpAutoSyncInterval: parseInt(localStorage.getItem('vcc_pre_ntp_interval') || '0'),
-            ntpLastOffset: parseInt(localStorage.getItem('vcc_pre_ntp_offset') || '0'),
-            ntpLastSyncTime: localStorage.getItem('vcc_pre_ntp_last_sync') || '',
+            ntpServerUrl: 'stdtime.gov.hk',
+            ntpAutoSyncInterval: 600,
+            ntpLastOffset: 0,
+            ntpLastSyncTime: '',
             version: 3
         };
     }
@@ -1377,18 +1374,15 @@
         appConfig.timezone = document.getElementById('cfgTimezone').value;
         appConfig.retentionSeconds = parseInt(document.getElementById('cfgRetentionSec').value) || 5;
         appConfig.lastSelectedDate = document.getElementById('globalTargetDate').value;
-        appConfig.ntpServerUrl = NTPManager.config.ntpServerUrl;        // Read NTP UI fields into NTPManager.config
         const ntpUrlInput = document.getElementById('cfgNtpUrl');
         const ntpIntervalInput = document.getElementById('cfgNtpInterval');
         if (ntpUrlInput) {
             NTPManager.config.ntpServerUrl = ntpUrlInput.value;
             appConfig.ntpServerUrl = ntpUrlInput.value;
-            localStorage.setItem('vcc_pre_ntp_server_url', ntpUrlInput.value);
         }
         if (ntpIntervalInput) {
             NTPManager.config.ntpAutoSyncInterval = parseInt(ntpIntervalInput.value) || 0;
             appConfig.ntpAutoSyncInterval = parseInt(ntpIntervalInput.value) || 0;
-            localStorage.setItem('vcc_pre_ntp_interval', String(parseInt(ntpIntervalInput.value) || 0));
         }
 
         appConfig.ntpAutoSyncInterval = NTPManager.config.ntpAutoSyncInterval;
@@ -1421,25 +1415,21 @@
         const fpsLabel = document.getElementById('sidebarFpsLabel');
         if (fpsLabel) fpsLabel.innerText = frameRate + ' fps';
 
-        // 載入 NTP 設定
-        const storedUrl = appConfig.ntpServerUrl || localStorage.getItem('vcc_pre_ntp_server_url') || 'https://worldtimeapi.org/api/timezone/Asia/Hong_Kong';
-        const storedInterval = appConfig.ntpAutoSyncInterval || parseInt(localStorage.getItem('vcc_pre_ntp_interval') || '0');
-        const storedOffset = appConfig.ntpLastOffset || parseInt(localStorage.getItem('vcc_pre_ntp_offset') || '0');
-        const storedSyncTime = appConfig.ntpLastSyncTime || localStorage.getItem('vcc_pre_ntp_last_sync') || '';
-        NTPManager.config.ntpServerUrl = storedUrl;
-        NTPManager.config.ntpAutoSyncInterval = storedInterval;
-        NTPManager.offset = storedOffset;
-        NTPManager.lastSyncTime = storedSyncTime;
-        if (storedOffset) {
-            timeOffset = storedOffset;
+        // 載入 NTP 設定 (only from appConfig, no localStorage)
+        NTPManager.config.ntpServerUrl = appConfig.ntpServerUrl || 'stdtime.gov.hk';
+        NTPManager.config.ntpAutoSyncInterval = parseInt(appConfig.ntpAutoSyncInterval) || 600;
+        NTPManager.offset = parseInt(appConfig.ntpLastOffset) || 0;
+        NTPManager.lastSyncTime = appConfig.ntpLastSyncTime || '';
+        if (NTPManager.offset) {
+            timeOffset = NTPManager.offset;
             NTPManager.status = 'fallback';
         }
-    }
         // Restore NTP config inputs
         const ntpUrl = document.getElementById('cfgNtpUrl');
         const ntpInterval = document.getElementById('cfgNtpInterval');
         if (ntpUrl && appConfig.ntpServerUrl) ntpUrl.value = appConfig.ntpServerUrl;
         if (ntpInterval && appConfig.ntpAutoSyncInterval) ntpInterval.value = appConfig.ntpAutoSyncInterval;
+    }
 
     function updateNtpStatusUI() {        // Also update settings UI when available
         updateSettingsNtpUI();
@@ -2672,35 +2662,23 @@
     }
 
     function syncWithNetworkTime(callback) {
-        // First try API.ntpStatus() to get current server state
+        // Try API.ntpStatus() to get current server state; if unreachable, keep existing offset.
         API.ntpStatus().then(function(statusResult) {
             if (statusResult && statusResult.status === 'connected') {
                 NTPManager.status = 'connected';
                 NTPManager.offset = statusResult.offset_ms || 0;
-                NTPManager.lastSyncTime = statusResult.last_sync || new Date().toISOString();
+                NTPManager.lastSyncTime = statusResult.last_sync || '';
                 NTPManager.errorMsg = '';
                 timeOffset = NTPManager.offset;
             } else {
-                // Fallback to stored localStorage offset
-                const storedOffset = parseInt(localStorage.getItem('vcc_pre_ntp_offset') || '0');
-                const storedSyncTime = localStorage.getItem('vcc_pre_ntp_last_sync') || '';
-                if (storedOffset) {
-                    timeOffset = storedOffset;
-                    NTPManager.offset = storedOffset;
-                    NTPManager.lastSyncTime = storedSyncTime;
-                    NTPManager.status = storedOffset !== 0 ? 'fallback' : 'local';
-                }
+                // Server responded but NTP not connected — keep current offset
+                NTPManager.status = statusResult && statusResult.status === 'error' ? 'error' : 'fallback';
+                NTPManager.errorMsg = (statusResult && statusResult.error_msg) || 'NTP 未同步';
             }
         }).catch(function() {
-            // Fallback to stored localStorage offset
-            const storedOffset = parseInt(localStorage.getItem('vcc_pre_ntp_offset') || '0');
-            const storedSyncTime = localStorage.getItem('vcc_pre_ntp_last_sync') || '';
-            if (storedOffset) {
-                timeOffset = storedOffset;
-                NTPManager.offset = storedOffset;
-                NTPManager.lastSyncTime = storedSyncTime;
-                NTPManager.status = storedOffset !== 0 ? 'fallback' : 'local';
-            }
+            // Server unreachable — keep existing NTPManager offset (from this session or 0)
+            NTPManager.status = NTPManager.offset !== 0 ? 'fallback' : 'local';
+            NTPManager.errorMsg = '無法連線至伺服器';
         }).finally(function() {
             if (callback) callback();
             // ===== Non-blocking API fetch for fresher data =====
