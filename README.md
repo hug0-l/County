@@ -1,25 +1,39 @@
-# ⚡ 快速開始
+# ⚡ County — 廣播排控倒數系統 v0.8
 
-## 需求
-- Python 3.10+
-- 網路連線（NTP 校時用，可不連線但會降級至本地時鐘）
+![version](https://img.shields.io/badge/version-0.8-blue)
+![python](https://img.shields.io/badge/python-3.10%2B-green)
+![fastapi](https://img.shields.io/badge/FastAPI-%E2%9C%93-success)
+![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
-## 安裝與啟動
+一個專為廣播電視台排控中心設計的 **全端節目排程與 Cue 觸發系統**。  
+前端 SPA 提供即時時間軸視覺化、Cue 點自動觸發、Preset 管理；後端支援多人共享與資料持久化。
+
+## ⚡ 快速開始
+
 ```bash
 # 1. 安裝依賴
 pip install -r requirements.txt
 
-# 2. 啟動伺服器（自動開啟瀏覽器）
+# 2. 啟動伺服器
 python server.py
+
+# 瀏覽器自動開啟 http://localhost:8000
 ```
 
-瀏覽器自動開啟 `http://localhost:8000`，您的主控台就在這裡！
+### Windows 一鍵啟動（PyInstaller）
+```powershell
+# 下載 Release 中的 County.exe
+# 雙擊執行即可，瀏覽器自動開啟
+```
 
-## 🆕 v0.6 新功能
-- **真實 NTP 校時** — 使用 ntplib 連接香港天文台 stdtime.gov.hk，精度 ±5ms
-- **Python 後端** — FastAPI + SQLite，資料不再受瀏覽器限制
-- **自動備份** — 每次啟動自動備份資料庫
-- **開罐即用** — 一條指令啟動完整系統
+## 🆕 v0.8 新功能
+- **🏗️ 模組化重構** — 從單一 4734 行 SPA 拆分為 15 個獨立模組，故障隔離
+- **🚨 自診斷系統** — 啟動逾時自動顯示錯誤畫面、runtime error Toast、設定頁一鍵健康檢查
+- **🔒 Preset 保護** — 可開關，防止誤刪內建預設集
+- **⏱ Cue 順序排列** — Preset 節點一鍵按時間軸排序，附開始/結束區段視覺分隔
+- **🎨 UX 全面改善** — 頁面動畫、NTP loading、ENGINE 按鈕進度、日期選取器、搜尋清除、Clipper 連線回饋等
+- **🔌 資料驗證 API** — 後端結構化錯誤回傳 + 時程重疊檢測
+- **☁️ API-first 架構** — 後端 SQLite 為主，localStorage 唯讀快取
 
 ---
 
@@ -57,21 +71,37 @@ python server.py
 
 ```
 county/
-├── server.py                        # 🚀 Python 後端伺服器 (FastAPI + SQLite + ntplib)
+├── server.py                        # 🚀 Python 後端 (FastAPI + SQLite + ntplib)
 ├── requirements.txt                 # Python 依賴
+├── county.spec                      # PyInstaller 打包設定
+├── tests/
+│   └── smoke_test.py                # 整合測試腳本
 ├── templates/
-│   └── index.html                   # 📄 主系統 SPA（JS/CSS/HTML 集中此檔）
-├── static/                          # 靜態資源目錄
-├── backups/                         # 自動備份目錄
-├── county.db                       # SQLite 資料庫（執行後自動產生）
-├── README.md                        # 📄 本架構文件
-├── AGENTS.md                        # Agent 工作指引
-├── CHANGELOG.md                     # 版本歷史
-└── templates/index.html          # 前端 SPA（由 server.py 提供服務）
+│   └── index.html                   # 📄 HTML 骨架 (~500行)
+├── static/
+│   ├── county.css                   # 🎨 全部樣式 (~520行)
+│   ├── county-core.js               # 命名空間 + 模組載入器
+│   ├── county-helpers.js            # 共用工具函數
+│   ├── county-config.js             # 設定管理
+│   ├── county-api.js                # API 客戶端
+│   ├── county-time.js               # 時碼引擎 + NTP
+│   ├── county-log.js                # 日誌系統
+│   ├── county-data.js               # 資料層
+│   ├── county-sound.js              # 音效系統
+│   ├── county-engine.js             # CUE 引擎
+│   ├── county-ui-live.js            # 首頁 UI
+│   ├── county-ui-rundown.js         # 排程頁 UI
+│   ├── county-ui-preset.js          # Preset 頁 UI
+│   ├── county-ui-settings.js        # 設定頁 UI
+│   ├── county-ui-clipper.js         # Clipper IM UI
+│   ├── clipper-sdk.js               # Clipper SDK
+│   └── CHANGELOG.md                 # 版本歷史
+├── logs/                            # 伺服器日誌
+├── backups/                         # 自動備份
+└── county.db                       # SQLite 資料庫
 ```
 
-> ⚠️ `templates/index.html` 為目前主系統 SPA，由 `server.py` 提供服務。
-> 使用時無需直接開啟 HTML 檔案，執行 `python server.py` 即可。
+> 使用 `python server.py` 啟動，瀏覽器訪問 `http://localhost:8000`。
 
 ## 3. 前端頁面架構
 

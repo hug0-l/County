@@ -1,5 +1,28 @@
 # County — 更新日誌
 
+## v0.8 (2026-06-20)
+- **🏗️ 模組化重構** — 從單體 SPA (4734行) 拆分為 15 個獨立 JS 模組 + 獨立 CSS
+- **🔌 後端資料驗證 API** — 新增 `/api/schedule/validate`、`/api/preset/validate` + 時段重疊檢測
+- **☁️ API-first 資料架構** — 後端 SQLite 為主，localStorage 唯讀快取
+- **🚨 自診斷系統** — 啟動探針（5秒逾時紅底畫面）、全局錯誤邊界（Toast + 上傳）、設定頁健康儀表板 + 一鍵診斷
+- **🔒 Preset 保護開關** — 可開關的內建 Preset 刪除保護，設在 Preset 管理器頁
+- **⏱ Cue 順序排序** — Preset 節點一鍵按時間軸排列，開始/結束區段自動分隔
+- **🎨 UX 全面改善：**
+  - 備份列只顯示在首頁/排程頁
+  - NTP 啟動 loading 動畫
+  - ENGINE 按鈕 loading 狀態
+  - 頁面切換淡入動畫 (0.15s)
+  - 搜尋清除按鈕 (✕)
+  - Clipper 連線進度回饋
+  - 行事曆「今天」按鈕
+  - 全局觀測日期移到 status bar
+  - 矩陣顏色圖例
+  - 手機側欄自動收起
+  - Console 自動滾動鎖定
+  - 拖曳排序限於 ⋮⋮ 把手（不干擾文字選取）
+  - 快速修改支援即將進行節目
+  - Preset 節點按 Cue 觸發先後排序（附視覺分隔線）
+
 ## v0.7 (2026-06-20)
 - **💬 Clipper IM 即時通訊分頁** — 側邊欄加入「💬 Clipper IM」分頁，WebSocket 即時聊天
 - **📦 ClipperSDK 整合** — 改用 `clipper-sdk.js` 對接完整 Clipper 協議，不再自製 WS 協議

@@ -73,7 +73,7 @@ setTimeout(function() {
             <div class="status-panel">
                 <div>
                     <div class="status-item">時鐘基準：<span id="syncBadge" class="sync-badge sync-loading">🖥️ 本地系統時鐘</span> <span id="ntpStatus" style="font-size:11px; color:#64748b;"></span> <span id="ntpLoadingIndicator" style="display:inline-flex;align-items:center;gap:4px;color:#f59e0b;font-size:11px;"><span style="width:10px;height:10px;border:2px solid #f59e0b;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></span>同步時間中...</span></div>
-                    <div class="status-item">全域觀測日期：<span id="lblGlobalDateDisplay">--</span></div>                    <div class="status-item">時鐘基準：<span id="syncBadge" class="sync-badge sync-loading">🖥️ 本地系統時鐘</span> <span id="ntpStatus" style="font-size:11px; color:#64748b;"></span> <span id="ntpLoadingIndicator" style="display:inline-flex;align-items:center;gap:4px;color:#f59e0b;font-size:11px;"><span style="width:10px;height:10px;border:2px solid #f59e0b;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></span>同步時間中...</span></div>
+                    <div class="status-item">全域觀測日期：<span id="lblGlobalDateDisplay">--</span></div>
                     <div class="status-item" style="display:flex;align-items:center;gap:8px;">
                         <span style="color:#9ca3af;font-size:12px;">📅</span>
                         <input type="date" id="globalTargetDate" onchange="onGlobalDateChange()"
@@ -222,15 +222,9 @@ setTimeout(function() {
                             <div class="calendar-nav-header">
                                 <div class="calendar-nav-btn" onclick="moveCalendarMonth(-1)">◀</div>
                                 <span id="calendarMonthLabel">2026 年 06 月</span>
-                                <div class="calendar-nav-btn" onclick="moveCalendarMonth(1)">▶</div>                            <div class="calendar-nav-header">
-                                <div class="calendar-nav-btn" onclick="moveCalendarMonth(-1)">◀</div>
-                                <span id="calendarMonthLabel">2026 年 06 月</span>
                                 <div class="calendar-nav-btn" onclick="moveCalendarMonth(1)">▶</div>
                                 <button class="calendar-nav-btn" onclick="goToToday()" style="font-size:11px;padding:2px 8px;">📅 今天</button>
                             </div>
-                            <div class="calendar-grid-head">
-                                <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
-                            </div>                            </div>
                             <div class="calendar-grid-head">
                                 <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
                             </div>
@@ -1832,7 +1826,7 @@ setTimeout(function() {
 
             // 日期數字
             const daySpan = document.createElement('span');
-            daySpan.style.cssText = 'font-size:13px;font-weight:bold;line-height:1.2;';
+            daySpan.style.cssText = 'font-weight:bold;line-height:1.2;';
             daySpan.innerText = day;
             cell.appendChild(daySpan);
 
@@ -2103,7 +2097,6 @@ setTimeout(function() {
         const tbody = document.getElementById('presetNodesTbody');
         const row = document.createElement('tr');
         row.className = 'preset-node-row';
-        row.draggable = true;
         row.setAttribute('data-drag-idx', tbody.children.length);
 
         let offsetType = nodeData ? nodeData.offsetType : '開始前';
@@ -2111,11 +2104,12 @@ setTimeout(function() {
         const nodeName = nodeData ? nodeData.nodeName : '新節點';
         let soundId = nodeData ? nodeData.soundId : 'short_beep';
 
-        // Drag handle TD
+        // Drag handle TD — only draggable from here
         const tdDrag = document.createElement('td');
         tdDrag.style.cssText = 'text-align:center;cursor:grab;';
         tdDrag.textContent = '⋮⋮';
         tdDrag.className = 'drag-handle';
+        tdDrag.draggable = true;
         row.appendChild(tdDrag);
 
         const td1 = document.createElement('td');
@@ -2176,8 +2170,8 @@ setTimeout(function() {
         td5.appendChild(btnDel);
         row.appendChild(td5);
 
-        // Drag & Drop 事件
-        row.addEventListener('dragstart', function(e) {
+        // Drag & Drop 事件 — 只從 ⋮⋮ 拖動，文字可選取/複製
+        tdDrag.addEventListener('dragstart', function(e) {
             e.dataTransfer.setData('text/plain', Array.from(tbody.children).indexOf(row));
             row.classList.add('dragging');
         });
@@ -2352,31 +2346,48 @@ setTimeout(function() {
         data.forEach(function(d) { addNodeRow(d); });
     }
 
-    // 一鍵按 Cue 觸發先後順序排列
+    // 一鍵按 Cue 觸發先後順序排列（依時間軸分組 + 視覺分隔）
     function sortNodesByCueOrder() {
         const tbody = document.getElementById('presetNodesTbody');
         const rows = Array.from(tbody.querySelectorAll('tr'));
         if (rows.length < 2) return;
-        const REF = 1800;
-        rows.sort(function(a, b) {
-            var aType = a.querySelector('.offsetType').value;
-            var bType = b.querySelector('.offsetType').value;
-            var aSec = mmssToSec(a.querySelector('.offsetSec').value);
-            var bSec = mmssToSec(b.querySelector('.offsetSec').value);
-            function key(type, sec) {
-                if (type === '開始前') return -100000 - sec;
-                if (type === '開始後') return 0 + sec;
-                if (type === '結束前') return 100000 - sec;
-                if (type === '結束時') return 200000;
-                return 0;
-            }
-            return key(aType, aSec) - key(bType, bSec);
+        const REF = 1800; // 參考節目時長 30min
+        // 收集資料並計算 estimatedAbsSec（與 sortPresetNodes 一致）
+        var data = [];
+        rows.forEach(function(row) {
+            var type = row.querySelector('.offsetType').value;
+            var sec = mmssToSec(row.querySelector('.offsetSec').value);
+            var est;
+            if (type === '開始前') est = -sec;
+            else if (type === '開始後') est = sec;
+            else if (type === '結束前') est = REF - sec;
+            else est = REF; // 結束時
+            data.push({ row: row, type: type, sec: sec, est: est });
         });
-        rows.forEach(function(r) { tbody.appendChild(r); });
+        data.sort(function(a, b) { return a.est - b.est; });
+        // 清空 tbody 後重新插入，並在「開始/開始後」與「結束前/結束時」之間加入分隔線
+        tbody.innerHTML = '';
+        var lastWasEnd = false;
+        data.forEach(function(d) {
+            var isEndBlock = (d.type === '結束前' || d.type === '結束時');
+            if (isEndBlock && !lastWasEnd && tbody.children.length > 0) {
+                // 加入分隔行
+                var divider = document.createElement('tr');
+                divider.className = 'cue-section-divider';
+                var td = document.createElement('td');
+                td.colSpan = 6;
+                td.style.cssText = 'padding:0;border:none;';
+                td.innerHTML = '<div style="border-top:2px dashed #374151;margin:4px 0;position:relative;"><span style="position:absolute;top:-8px;right:8px;background:#111827;padding:0 8px;font-size:10px;color:#64748b;">▼ 結束區段</span></div>';
+                divider.appendChild(td);
+                tbody.appendChild(divider);
+            }
+            tbody.appendChild(d.row);
+            lastWasEnd = isEndBlock;
+        });
         document.querySelectorAll('#presetNodesTable .sort-icon').forEach(function(el) {
             el.textContent = ''; el.classList.remove('active');
         });
-        writeLog("⏱ 已按 Cue 觸發先後順序排列", 'info');
+        writeLog("⏱ 已按 Cue 觸發先後順序排列（開始 ⇢ 結束）", 'info');
     }
 
     function onPresetSelectionChange() {
@@ -2990,12 +3001,22 @@ setTimeout(function() {
             const activeList = getExpandedRundownForDate(targetDateStr);
             const currentTotalFrames = timecodeToTotalFrames(dateToTimecode(getCalibratedDate()));
             let target = null;
+            // 先找正在播出的節目
             activeList.forEach(function(p) {
                 const sf = timecodeToTotalFrames(p.startTime);
                 const ef = sf + timecodeToTotalFrames(p.duration);
                 if (currentTotalFrames >= sf && currentTotalFrames <= ef) target = p;
             });
-            if (!target) { alert('目前無播出中節目'); return; }
+            // 沒有正在播出的，則找即將進行的（最近一個未來開始時間）
+            if (!target) {
+                let nearestDiff = Infinity;
+                activeList.forEach(function(p) {
+                    const sf = timecodeToTotalFrames(p.startTime);
+                    const diff = sf - currentTotalFrames;
+                    if (diff > 0 && diff < nearestDiff) { nearestDiff = diff; target = p; }
+                });
+            }
+            if (!target) { alert('目前無播出中或即將進行的節目'); return; }
             quickEditTargetId = target.id;
             document.getElementById('quickStartTime').value = target.startTime;
             document.getElementById('quickDuration').value = target.duration;
@@ -3244,6 +3265,7 @@ setTimeout(function() {
 
     function deleteProgram(id) {
         if (currentEditingId === id) exitEditMode();
+        if (!confirm("確定刪除此節目？")) return;
         API.deleteSchedule(id).catch(function() {});
         masterScheduleDB = masterScheduleDB.filter(function(p) { return p.id !== id; });
         _cacheToLocalStorage();

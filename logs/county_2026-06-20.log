@@ -115,3 +115,9 @@
 2026-06-20 17:26:25 [INFO   ] 🕒 NTP syncing to stdtime.gov.hk...
 2026-06-20 17:26:30 [WARN   ] ⚠️ NTP initial sync: error — No response received from stdtime.gov.hk.
 2026-06-20 17:26:30 [INFO   ] 🔄 NTP auto-sync thread started (interval: 600s)
+2026-06-20 17:33:09 [INFO   ] 🚀 Server running at http://localhost:8000
+2026-06-20 17:33:09 [INFO   ] 🕒 NTP syncing to stdtime.gov.hk...
+2026-06-20 17:33:14 [WARN   ] ⚠️ NTP initial sync: error — No response received from stdtime.gov.hk.
+2026-06-20 17:33:14 [INFO   ] 🔄 NTP auto-sync thread started (interval: 600s)
+2026-06-20 17:43:14 [INFO   ] 🕒 NTP auto-sync: connected (offset=99.09ms)
+2026-06-20 17:53:19 [WARN   ] ⚠️ NTP auto-sync: fallback — No response received from stdtime.gov.hk.
