@@ -7,3 +7,4 @@
 2026-06-20 14:48:28 [INFO   ] 🕒 NTP syncing to stdtime.gov.hk...
 2026-06-20 14:48:28 [INFO   ] ✅ NTP synced: offset=44.36ms
 2026-06-20 14:48:28 [INFO   ] 🔄 NTP auto-sync thread started (interval: 600s)
+2026-06-20 14:58:28 [INFO   ] 🕒 NTP auto-sync: connected (offset=45.24ms)
