@@ -1195,18 +1195,6 @@
         });
     }
 
-    function newDataFile() {
-        if (!confirm('清除所有資料？確定？')) return;
-        cuePresets = {}; masterScheduleDB = []; appConfig = null;
-        localStorage.clear();
-        loadDefaultPresets();
-        saveConfig();
-        markDirty();
-        renderGUICalendar(); renderWeekGlance(); calculateMCRTrafficSummary(); renderRundownUI();
-        refreshPresetDropdownUI(); onPresetSelectionChange();
-        if (isTrackingActive) { isTrackingActive = false; location.reload(); }
-        writeLog('✕ 已清除所有資料', 'warn');
-    }
 
     // ===== 全域狀態變數 =====
     let timerInterval = null;        // 核心引擎 40ms 定時器 (ENGINE)

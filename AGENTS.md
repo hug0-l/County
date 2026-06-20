@@ -19,7 +19,7 @@ vcc-countdownctrl/
 ├── README.md                        # 架構文件（開發前請先閱讀）
 ├── AGENTS.md                        # 本文件（Agent 工作指引）
 ├── CHANGELOG.md                     # 版本歷史
-└── VPre_CountdownCtrl_PROD_v0.5.html # 純前端備份（v0.5 以前版本）
+└── templates/index.html          # 前端 SPA（由 server.py 提供服務）
 ```
 
 > 啟動方式：`pip install -r requirements.txt && python server.py`

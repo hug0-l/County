@@ -67,7 +67,7 @@ vcc-countdownctrl/
 ├── README.md                        # 📄 本架構文件
 ├── AGENTS.md                        # Agent 工作指引
 ├── CHANGELOG.md                     # 版本歷史
-└── VPre_CountdownCtrl_PROD_v0.5.html # 純前端備份（v0.5 以前版本）
+└── templates/index.html          # 前端 SPA（由 server.py 提供服務）
 ```
 
 > ⚠️ `templates/index.html` 為目前主系統 SPA，由 `server.py` 提供服務。
