@@ -312,6 +312,8 @@
         .sort-icon.active { color:#38bdf8; }
 
         /* 拖動排序 */
+        @keyframes spin { to { transform: rotate(360deg); } }
+
         .drag-handle { cursor:grab; color:#4b5563; font-size:14px; user-select:none; text-align:center; padding:2px 0; }
         .drag-handle:active { cursor:grabbing; }
         .preset-node-row.dragging { opacity:0.4; }

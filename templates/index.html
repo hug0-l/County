@@ -72,23 +72,13 @@ setTimeout(function() {
 
             <div class="status-panel">
                 <div>
-                    <div class="status-item">時鐘基準：<span id="syncBadge" class="sync-badge sync-loading">🖥️ 本地系統時鐘</span> <span id="ntpStatus" style="font-size:11px; color:#64748b;"></span></div>
+                    <div class="status-item">時鐘基準：<span id="syncBadge" class="sync-badge sync-loading">🖥️ 本地系統時鐘</span> <span id="ntpStatus" style="font-size:11px; color:#64748b;"></span> <span id="ntpLoadingIndicator" style="display:inline-flex;align-items:center;gap:4px;color:#f59e0b;font-size:11px;"><span style="width:10px;height:10px;border:2px solid #f59e0b;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></span>同步時間中...</span></div>
                     <div class="status-item">全域觀測日期：<span id="lblGlobalDateDisplay">--</span></div>
                 </div>
                 <div style="text-align: right;">
                     <div style="font-size: 12px; color: #9ca3af; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1.5px;">Master Timecode</div>
                     <div id="clock" style="text-align:center;">00:00:00:00</div>
                 </div>
-            </div>
-
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; padding:4px 10px; background:#111827; border:1px solid #1f2937; border-radius:4px; font-size:11px;">
-                <span style="color:#64748b;">📦</span>
-                <span id="fileStatus" style="color:#10b981; font-weight:bold;">localStorage</span>
-                <span style="flex:1;"></span>
-                <span id="dataDirtyIndicator" style="color:#10b981; font-size:10px;">✅ 自動</span>
-                <button class="btn-ctrl btn-export-ui" onclick="saveDataToFile()" style="padding:2px 10px; font-size:10px;">⬇ 備份</button>
-                <button class="btn-ctrl btn-import-ui" onclick="loadDataFromFile()" style="padding:2px 10px; font-size:10px;">⬆ 復原</button>
-                <input type="file" id="dataFileInput" accept=".json" style="display:none;" onchange="handleFileOpen(this)">
             </div>
 
             <div class="global-filter-bar" style="display: none;">
@@ -103,6 +93,15 @@ setTimeout(function() {
                     <div id="cueCountdownLabel" style="font-size:14px; color:#c7d2fe; margin-bottom:4px;">—</div>
                     <div id="cueCountdownTimer" style="font-family:'Courier New',monospace; font-size:48px; font-weight:bold; color:#e0e7ff; text-shadow:0 0 12px rgba(165,180,252,0.5);">--:--</div>
                     <div id="cueCountdownMeta" style="font-size:12px; color:#a5b4fc; margin-top:6px;"></div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; padding:4px 10px; background:#111827; border:1px solid #1f2937; border-radius:4px; font-size:11px;">
+                    <span style="color:#64748b;">📦</span>
+                    <span id="fileStatus" style="color:#10b981; font-weight:bold;">localStorage</span>
+                    <span style="flex:1;"></span>
+                    <span id="dataDirtyIndicator" style="color:#10b981; font-size:10px;">✅ 自動</span>
+                    <button class="btn-ctrl btn-export-ui" onclick="saveDataToFile()" style="padding:2px 10px; font-size:10px;">⬇ 備份</button>
+                    <button class="btn-ctrl btn-import-ui" onclick="loadDataFromFile()" style="padding:2px 10px; font-size:10px;">⬆ 復原</button>
+                    <input type="file" id="dataFileInput" accept=".json" style="display:none;" onchange="handleFileOpen(this)">
                 </div>
 
                 <div class="mcr-operator-grid">
@@ -201,6 +200,16 @@ setTimeout(function() {
             </div>
 
             <div id="page-rundown" class="page">
+
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; padding:4px 10px; background:#111827; border:1px solid #1f2937; border-radius:4px; font-size:11px;">
+                    <span style="color:#64748b;">📦</span>
+                    <span id="fileStatus2" style="color:#10b981; font-weight:bold;">localStorage</span>
+                    <span style="flex:1;"></span>
+                    <span id="dataDirtyIndicator2" style="color:#10b981; font-size:10px;">✅ 自動</span>
+                    <button class="btn-ctrl btn-export-ui" onclick="saveDataToFile()" style="padding:2px 10px; font-size:10px;">⬇ 備份</button>
+                    <button class="btn-ctrl btn-import-ui" onclick="loadDataFromFile()" style="padding:2px 10px; font-size:10px;">⬆ 復原</button>
+                </div>
+
                 <div class="grid-layout-2col">
                     <div class="panel-box" style="margin-bottom: 0;">
                         <div class="panel-header-box"><div class="panel-title">行事曆 (Calendar)</div></div>
@@ -358,6 +367,7 @@ setTimeout(function() {
                         </div>
                         <div class="input-group">
                             <label>節點設定 (每行一個提示點)</label>
+                            <div style="font-size:11px;color:#64748b;margin-bottom:4px;">💡 拖曳 ⋮⋮ 排序節點</div>
                             <table id="presetNodesTable">
                                 <thead>
                                     <tr>
@@ -489,6 +499,8 @@ setTimeout(function() {
                                 <input type="file" id="configImportFile" accept=".json" style="display:none;" onchange="importConfigFromFile(this)">
                                 <button class="btn-ctrl btn-import-ui" style="font-size:10px; padding:4px 8px;" onclick="document.getElementById('configImportFile').click()">匯入</button>
                                 <button class="btn-cancel btn-danger-action" style="font-size:10px; padding:4px 8px;" onclick="factoryResetStorage()">🚨 重置</button>
+                                <button class="btn-ctrl btn-export-ui" style="font-size:10px; padding:4px 8px;" onclick="saveDataToFile()">⬇ 備份</button>
+                                <button class="btn-ctrl btn-import-ui" style="font-size:10px; padding:4px 8px;" onclick="loadDataFromFile()">⬆ 復原</button>
                             </div>
                         </div>
                         <div class="panel-box" style="margin-top:15px;">
@@ -1221,6 +1233,11 @@ setTimeout(function() {
             badge.className = 'sync-badge sync-success';
             badge.innerText = '🖥️ 本地時鐘';
             if (ntpStatusEl) ntpStatusEl.innerText = '';
+        }
+        // Hide NTP loading indicator when sync completes (any non-syncing state)
+        var ntpLoadEl = document.getElementById('ntpLoadingIndicator');
+        if (ntpLoadEl && status !== 'syncing') {
+            ntpLoadEl.style.display = 'none';
         }
     }
 
@@ -1993,7 +2010,20 @@ setTimeout(function() {
         syncWithNetworkTime(function() {
             updateNtpStatusUI();
             restartAutoSync();
+        });        // NTP 時間同步（非阻塞，保留現有 offset）
+        syncWithNetworkTime(function() {
+            updateNtpStatusUI();
+            restartAutoSync();
+            // Hide NTP loading indicator when sync completes
+            var ntpLoadEl = document.getElementById('ntpLoadingIndicator');
+            if (ntpLoadEl) ntpLoadEl.style.display = 'none';
         });
+
+        // 5秒後自動隱藏 NTP loading indicator（備用）
+        setTimeout(function() {
+            var ntpLoadEl = document.getElementById('ntpLoadingIndicator');
+            if (ntpLoadEl) ntpLoadEl.style.display = 'none';
+        }, 5000);
 
         // Create single master timer — handles clock + engine in one tick
         function masterTick() {
@@ -3303,11 +3333,16 @@ setTimeout(function() {
         const trackBtn = document.getElementById('btnMainTrack');
         // 如果已在運行，切換為停止
         if (isTrackingActive) {
+            if (trackBtn) {
+                trackBtn.innerText = '⏳ 引擎停止中...';
+                trackBtn.disabled = true;
+            }
             isTrackingActive = false;
             if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
             // _masterTimer keeps running — clock still updates
             if (trackBtn) {
                 trackBtn.style.backgroundColor = ""; trackBtn.innerText = "▶ 啟動主控監測 (RUN ENGINE)";
+                trackBtn.disabled = false;
             }
             const engineStatusEl = document.getElementById('homeEngineStatus');
             if (engineStatusEl) {
@@ -3324,9 +3359,15 @@ setTimeout(function() {
         const activeList = getExpandedRundownForDate(targetDateStr);
         if (activeList.length === 0) { alert("當前觀測日無資料可供時序監測運算"); return; }
 
+        if (trackBtn) {
+            trackBtn.innerText = '⏳ 引擎啟動中...';
+            trackBtn.disabled = true;
+        }
+
         isTrackingActive = true;
         if (trackBtn) {
             trackBtn.style.backgroundColor = "#ea580c"; trackBtn.innerText = "🚨 ENGINE LIVE (點擊停止)";
+            trackBtn.disabled = false;
         }
         const engineStatusEl = document.getElementById('homeEngineStatus');
         if (engineStatusEl) {
