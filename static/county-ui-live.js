@@ -33,11 +33,12 @@ County.register('LiveUI', function(C) {
             if (hasOverlapConflict) {
                 conflictBlockEl.classList.add('alert-active');
                 conflictStatusEl.innerText = '\u26a0\ufe0f \u6642\u5e8f\u91cd\u758a\u885d\u7a81';
-                conflictStatusEl.style.color = 'const(--danger)';
+                conflictStatusEl.style.color = 'var(--danger)';
             } else {
                 conflictBlockEl.classList.remove('alert-active');
                 conflictStatusEl.innerText = '\u25cf \u5b89\u5168\u6b63\u5e38';
-                conflictStatusEl.style.color = 'const(--success)';
+
+                conflictStatusEl.style.color = 'var(--success)';
             }
         }
     };

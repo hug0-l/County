@@ -384,7 +384,18 @@
             .vcc-pre-system-sandbox-wrapper { min-height:auto; }
         }
 
-        /* --- General spacing --- */
+                /* Cue Countdown Card (moved from inline style) */
+        .cue-countdown-card {
+            background:linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            border:2px solid #818cf8;
+            border-radius:10px;
+            padding:20px;
+            margin-bottom:20px;
+            text-align:center;
+            box-shadow:0 0 24px rgba(129,140,248,0.2);
+        }
+
+        /* --- General spacing --- *//* --- General spacing --- */
         @media(max-width: 768px) {
             .main-content { padding:12px !important; }
             .panel-box { padding:14px; }

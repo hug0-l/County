@@ -41,11 +41,12 @@ County.register('Engine', function(C) {
             if (hasOverlapConflict) {
                 conflictBlockEl.classList.add('alert-active');
                 conflictStatusEl.innerText = '\u26a0\ufe0f \u6642\u5e8f\u91cd\u758a\u885d\u7a81';
-                conflictStatusEl.style.color = 'const(--danger)';
+                conflictStatusEl.style.color = 'var(--danger)';
             } else {
                 conflictBlockEl.classList.remove('alert-active');
                 conflictStatusEl.innerText = '\u25cf \u5b89\u5168\u6b63\u5e38';
-                conflictStatusEl.style.color = 'const(--success)';
+
+                conflictStatusEl.style.color = 'var(--success)';
             }
         }
     };
@@ -114,7 +115,8 @@ County.register('Engine', function(C) {
         var engineStatusEl = document.getElementById('homeEngineStatus');
         if (engineStatusEl) {
             engineStatusEl.innerText = '\u6838\u5fc3\u904b\u7b97\u5f15\u64ce\uff1aON-AIR RUNNING';
-            engineStatusEl.style.color = 'const(--warning)';
+
+            engineStatusEl.style.color = 'var(--warning)';
         }
         var sideEng = document.getElementById('sidebarEngineStatus');
         if (sideEng) sideEng.innerText = '\U0001f7e2 ENGINE ON-AIR';

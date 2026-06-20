@@ -90,7 +90,7 @@ setTimeout(function() {
             </div>            <div id="page-live" class="page active">            <div id="page-live" class="page active">
 
                 <!-- ⏱ Cue 倒數大看板 — 首頁最上方 -->
-                <div id="homeCueCountdown" style="background:linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); border:2px solid #818cf8; border-radius:10px; padding:20px; margin-bottom:20px; text-align:center; box-shadow:0 0 24px rgba(129,140,248,0.2);">
+                <div id="homeCueCountdown" class="cue-countdown-card">
                     <div style="font-size:11px; color:#a5b4fc; text-transform:uppercase; letter-spacing:2px; margin-bottom:6px;">⏱ 下一個 Cue 倒數</div>
                     <div id="cueCountdownLabel" style="font-size:14px; color:#c7d2fe; margin-bottom:4px;">—</div>
                     <div id="cueCountdownTimer" style="font-family:'Courier New',monospace; font-size:48px; font-weight:bold; color:#e0e7ff; text-shadow:0 0 12px rgba(165,180,252,0.5);">--:--</div>
@@ -602,7 +602,8 @@ setTimeout(function() {
                                 <button class="btn-ctrl btn-import-ui" onclick="document.getElementById('consoleTerminal').innerHTML='';" style="padding:2px 8px; font-size:10px;">🗑 清除</button>
                             </div>
                         </div>
-                        <div class="console-terminal" id="consoleTerminal"></div>
+                                                <div id="consoleScrollLock" class="console-scroll-lock" style="display:none;font-size:10px;color:#f59e0b;text-align:right;padding:2px 6px;background:#111827;border-bottom:1px solid #1f2937;cursor:pointer;" onclick="document.getElementById('consoleTerminal').scrollTop = document.getElementById('consoleTerminal').scrollHeight;this.style.display='none';">⬆ 自動滾動已鎖定 — 點擊恢復</div>
+                        <div class="console-terminal" id="consoleTerminal"></div><div class="console-terminal" id="consoleTerminal"></div>
                     </div>
 
                     <!-- 系統健康面板 -->
@@ -1440,19 +1441,32 @@ setTimeout(function() {
     }, CLIENT_LOG_UPLOAD_INTERVAL);
 
     function writeLog(message, type = 'info') {
+        // --- Console scroll-lock indicator ---
+        var scrollLockEl = document.getElementById('consoleScrollLock');
+        if (scrollLockEl) scrollLockEl.style.display = 'none';
+
         // --- In-memory console display ---
         const consoleEl = document.getElementById('consoleTerminal');
         const now = new Date();
         const timeStr = now.toTimeString().split(' ')[0] + "." + String(now.getMilliseconds()).padStart(3, '0');
-        
+
         if (consoleEl) {
+            var isAtBottom = consoleEl.scrollTop + consoleEl.clientHeight >= consoleEl.scrollHeight - 10;
+
             let line = document.createElement('div');
             line.className = "console-line";
             if (type === 'error') line.style.color = "#ef4444";
             if (type === 'warn') line.style.color = "#f59e0b";
             line.innerHTML = '<span class="console-time">[' + timeStr + ']</span>' + message;
             consoleEl.appendChild(line);
-            consoleEl.scrollTop = consoleEl.scrollHeight;
+
+            if (isAtBottom) {
+                consoleEl.scrollTop = consoleEl.scrollHeight;
+            } else {
+                if (scrollLockEl) {
+                    scrollLockEl.style.display = 'block';
+                }
+            }
         }
 
         // Also output to browser console for developer tools
