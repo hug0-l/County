@@ -78,7 +78,6 @@ jobs:
           files: |
             ./dist-windows/County.exe
             ./dist-macos/County
-          generate_release_notes: true
           body: |
             ## County — 廣播排控倒數系統
 
