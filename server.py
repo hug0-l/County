@@ -27,7 +27,11 @@ import uvicorn
 # Logging
 # ---------------------------------------------------------------------------
 
-LOGS_DIR = Path(__file__).parent / "logs"
+if getattr(sys, 'frozen', False):
+    BASE_DIR = Path(sys._MEIPASS)
+else:
+    BASE_DIR = Path(__file__).parent
+LOGS_DIR = BASE_DIR / "logs"
 LOGS_DIR.mkdir(exist_ok=True)
 
 # Current server log file path (one log per day for 24h retention)
@@ -92,7 +96,7 @@ _clean_old_logs()
 # Database
 # ---------------------------------------------------------------------------
 
-DB_PATH = Path(__file__).parent / "county.db"
+DB_PATH = BASE_DIR / "county.db"
 
 
 def get_db() -> sqlite3.Connection:
@@ -389,11 +393,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static directory
-if getattr(sys, 'frozen', False):
-    BASE_DIR = Path(sys._MEIPASS)
-else:
-    BASE_DIR = Path(__file__).parent
+# Static directory (BASE_DIR already set at module top with frozen detection)
 BACKUP_DIR = BASE_DIR / "backups"
 static_dir = BASE_DIR / "static"
 static_dir.mkdir(exist_ok=True)
