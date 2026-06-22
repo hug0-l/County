@@ -90,6 +90,12 @@ setTimeout(function() {
             </div>
             <div id="page-live" class="page active">
 
+                                <!-- 📡 節目剩餘時間倒數 — 首頁上方 -->
+                <div id="homeProgCountdown" class="cue-countdown-card" style="margin-bottom:8px;">
+                    <div style="font-size:11px; color:#10b981; text-transform:uppercase; letter-spacing:2px; margin-bottom:6px;">📡 節目剩餘時間</div>
+                    <div id="progCountdownLabel" style="font-size:14px; color:#6ee7b7; margin-bottom:4px;">—</div>
+                    <div id="progCountdownTimer" style="font-family:'Courier New',monospace; font-size:48px; font-weight:bold; color:#d1fae5; text-shadow:0 0 12px rgba(16,185,129,0.5);">--:--</div>
+                </div>
                 <!-- ⏱ Cue 倒數大看板 — 首頁最上方 -->
                 <div id="homeCueCountdown" class="cue-countdown-card">
                     <div style="font-size:11px; color:#a5b4fc; text-transform:uppercase; letter-spacing:2px; margin-bottom:6px;">⏱ 下一個 Cue 倒數</div>
@@ -3951,6 +3957,23 @@ setTimeout(function() {
                         cueCDLabel.innerText = '—';
                         cueCDTimer.innerText = '--:--';
                         cueCDMeta.innerText = '尚無後續 Cue';
+                    }
+                }
+
+                // === Programme remaining-airtime countdown ===
+                var progCDLabel = document.getElementById('progCountdownLabel');
+                var progCDTimer = document.getElementById('progCountdownTimer');
+                if (progCDLabel && progCDTimer) {
+                    if (onAirProg) {
+                        var pf = onAirProg.endTotalFrames - currentTotalFrames;
+                        var ps = Math.max(0, Math.ceil(pf / frameRate));
+                        var pMin = Math.floor(ps / 60);
+                        var pSec = ps % 60;
+                        progCDLabel.innerText = onAirProg.name;
+                        progCDTimer.innerText = String(pMin).padStart(2,'0') + ':' + String(pSec).padStart(2,'0');
+                    } else {
+                        progCDLabel.innerText = '—';
+                        progCDTimer.innerText = '--:--';
                     }
                 }
             }

@@ -378,6 +378,23 @@ County.register('LiveUI', function(C) {
                         cueCDMeta.innerText = '\u5c1a\u7121\u5f8c\u7e8c Cue';
                     }
                 }
+
+                // === Programme remaining-airtime countdown ===
+                var progCDLabel = document.getElementById('progCountdownLabel');
+                var progCDTimer = document.getElementById('progCountdownTimer');
+                if (progCDLabel && progCDTimer) {
+                    if (onAirProg) {
+                        var pf = onAirProg.endTotalFrames - currentTotalFrames;
+                        var ps = Math.max(0, Math.ceil(pf / frameRate));
+                        var pMin = Math.floor(ps / 60);
+                        var pSec = ps % 60;
+                        progCDLabel.innerText = onAirProg.name;
+                        progCDTimer.innerText = String(pMin).padStart(2,'0') + ':' + String(pSec).padStart(2,'0');
+                    } else {
+                        progCDLabel.innerText = '\u2014';
+                        progCDTimer.innerText = '--:--';
+                    }
+                }
             }
 
             var windowStart = Math.max(0, nearestIdx - 3);
