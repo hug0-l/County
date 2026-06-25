@@ -44,6 +44,13 @@ setTimeout(function() {
 </head>
 <body>
 
+    <!-- 全局顏色狀態列 + Cue Alarm Bar -->
+    <div id="statusBarLine" style="position:fixed;top:0;left:0;width:100%;height:4px;z-index:99999;background:#4b5563;transition:background 0.3s;"></div>
+    <div id="cueAlarmBar" style="display:none;position:fixed;top:4px;left:0;width:100%;z-index:99998;background:linear-gradient(135deg,#dc2626,#991b1b);color:#fff;padding:10px 20px;font-size:14px;font-weight:bold;text-align:center;cursor:pointer;box-shadow:0 4px 16px rgba(220,38,38,0.4);animation:pulse 0.6s infinite alternate;" onclick="acknowledgeCueAlarm()">
+        <span id="cueAlarmText">🚨 CUE 觸發！請確認</span>
+        <span style="display:inline-block;margin-left:16px;padding:3px 12px;background:rgba(255,255,255,0.2);border-radius:4px;font-size:12px;">ACK ✓</span>
+    </div>
+
     <div class="vcc-pre-system-sandbox-wrapper">
 
         <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
@@ -51,20 +58,20 @@ setTimeout(function() {
 
         <div class="sidebar" id="mainSidebar">
             <div>
-                <div class="sidebar-header">County 排控調度中心</div>
+                <div class="sidebar-header" data-i18n="sidebar.title">County 排控調度中心</div>
                 <div class="sidebar-menu">
-                    <div class="menu-item active" id="menu-live" onclick="switchPage('live')">📡 首頁</div>
-                    <div class="menu-item" id="menu-rundown" onclick="switchPage('rundown')">📅 排程</div>
-                    <div class="menu-item" id="menu-preset" onclick="switchPage('preset')">📋 Preset</div>
-                    <div class="menu-item" id="menu-settings" onclick="switchPage('settings')">🛠️ 設定</div>
-                    <div class="menu-item" id="menu-clipper" onclick="switchPage('clipper')">💬 Clipper IM <span class="clipper-badge" id="clipperBadge">0</span></div>
-                    <div class="menu-item" id="menu-changelog" onclick="switchPage('changelog')">📜 更新日誌</div>
-                    <div class="menu-item" id="menu-help" onclick="switchPage('help')">📖 說明</div>
+                    <div class="menu-item active" id="menu-live" onclick="switchPage('live')" data-i18n="sidebar.home">📡 首頁</div>
+                    <div class="menu-item" id="menu-rundown" onclick="switchPage('rundown')" data-i18n="sidebar.schedule">📅 排程</div>
+                    <div class="menu-item" id="menu-preset" onclick="switchPage('preset')" data-i18n="sidebar.preset">📋 Preset</div>
+                    <div class="menu-item" id="menu-settings" onclick="switchPage('settings')" data-i18n="sidebar.settings">🛠️ 設定</div>
+                    <div class="menu-item" id="menu-clipper" onclick="switchPage('clipper')" data-i18n="sidebar.clipper">💬 Clipper IM <span class="clipper-badge" id="clipperBadge">0</span></div>
+                    <div class="menu-item" id="menu-changelog" onclick="switchPage('changelog')" data-i18n="sidebar.changelog">📜 更新日誌</div>
+                    <div class="menu-item" id="menu-help" onclick="switchPage('help')" data-i18n="sidebar.help">📖 說明</div>
                 </div>
             </div>
             <div class="sidebar-footer">
-                <span id="sidebarEngineStatus">⏹️ 引擎待命</span><br>
-                播出標準: <span id="sidebarFpsLabel">PAL 25 fps</span>
+                <span id="sidebarEngineStatus" data-i18n="sidebar.engine.standby">⏹️ 引擎待命</span><br>
+                <span data-i18n="sidebar.fps.label">播出標準: </span><span id="sidebarFpsLabel">PAL 25 fps</span>
             </div>
         </div>
 
@@ -101,6 +108,9 @@ setTimeout(function() {
                     <div style="font-size:11px; color:#a5b4fc; text-transform:uppercase; letter-spacing:2px; margin-bottom:6px;">⏱ 下一個 Cue 倒數</div>
                     <div id="cueCountdownLabel" style="font-size:14px; color:#c7d2fe; margin-bottom:4px;">—</div>
                     <div id="cueCountdownTimer" style="font-family:'Courier New',monospace; font-size:48px; font-weight:bold; color:#e0e7ff; text-shadow:0 0 12px rgba(165,180,252,0.5);">--:--</div>
+                    <div id="cueProgressBarWrap" style="width:100%;height:6px;background:#1f2937;border-radius:3px;overflow:hidden;margin-top:6px;display:none;">
+                        <div id="cueProgressBarFill" style="height:100%;width:0%;background:#f59e0b;border-radius:3px;transition:width 1s linear;"></div>
+                    </div>
                     <div id="cueCountdownMeta" style="font-size:12px; color:#a5b4fc; margin-top:6px;"></div>
                 </div>
                 </div>
@@ -120,10 +130,22 @@ setTimeout(function() {
                         <div class="mcr-tag-live" id="mcrLiveTag" style="display: none;">ON AIR</div>
                         <div class="mcr-label-sub">📡 當前播放節目 (Current Programme)</div>
                         <div class="mcr-prog-title" id="mcrOnAirTitle">無常規節目播出 (IDLE)</div>
-                        <div class="mcr-prog-countdown" id="mcrOnAirCountdown">系統靜態待命</div>                        
-                        <button id="btnQuickEdit" style="float:right; background:transparent; border:1px solid #4b5563; color:#9ca3af; border-radius:4px; cursor:pointer; font-size:11px; padding:2px 8px; margin-top:5px;" onclick="toggleQuickEdit()">✏️ 快速修改</button>
+                        <div class="mcr-prog-countdown" id="mcrOnAirCountdown">系統靜態待命</div>
 
-                        <div id="mcrQuickEdit" style="display:none; margin-top:10px; padding:10px; background:rgba(0,0,0,0.3); border-radius:6px;">
+                        <!-- 一鍵時間偏移按鈕 + Quick Edit -->
+                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px;">
+                            <span style="font-size:11px;color:#9ca3af;">偏移:</span>
+                            <button class="btn-sync" onclick="shiftProgram(null, -30)" style="padding:2px 10px;font-size:11px;" title="提早 30 秒">−30s</button>
+                            <button class="btn-sync" onclick="shiftProgram(null, 30)" style="padding:2px 10px;font-size:11px;" title="延後 30 秒">+30s</button>
+                            <button class="btn-sync" onclick="shiftProgram(null, 60)" style="padding:2px 10px;font-size:11px;" title="延後 1 分鐘">+1m</button>
+                            <button class="btn-sync" onclick="shiftProgram(null, 300)" style="padding:2px 10px;font-size:11px;" title="延後 5 分鐘">+5m</button>
+                            <span style="font-size:11px;color:#64748b;margin:0 2px;">|</span>
+                            <button style="background:transparent;border:1px solid #4b5563;color:#9ca3af;border-radius:4px;cursor:pointer;font-size:11px;padding:2px 8px;" onclick="toggleQuickEdit()">✏️ 詳細</button>
+                            <button style="background:transparent;border:1px solid #0891b2;color:#22d3ee;border-radius:4px;cursor:pointer;font-size:11px;padding:2px 8px;" onclick="showNotifyDialog()">🔊 通知</button>
+                            <span id="shiftUndoBtn" style="display:none;font-size:11px;color:#38bdf8;cursor:pointer;text-decoration:underline;" onclick="undoShiftProgram()">↩️ 還原</span>
+                        </div>
+
+                        <div id="mcrQuickEdit" style="display:none; margin-top:8px; padding:10px; background:rgba(0,0,0,0.3); border-radius:6px;">
                             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
                                 <label style="font-size:11px; color:#9ca3af;">開始: <input type="text" id="quickStartTime" style="width:130px; background:#090d16; border:1px solid #374151; color:#fff; padding:4px 6px; border-radius:3px; font-size:12px; font-family:monospace;"></label>
                                 <label style="font-size:11px; color:#9ca3af;">長度: <input type="text" id="quickDuration" style="width:130px; background:#090d16; border:1px solid #374151; color:#fff; padding:4px 6px; border-radius:3px; font-size:12px; font-family:monospace;"></label>
@@ -131,7 +153,6 @@ setTimeout(function() {
                                 <button class="btn-cancel" onclick="cancelQuickEdit()" style="padding:4px 12px; font-size:11px;">取消</button>
                             </div>
                         </div>
-
 
                         <div class="mcr-next-bar">
                             <div class="mcr-label-sub" style="margin-bottom: 2px;">➔ 下一檔預備接續 (Next Up)</div>
@@ -159,12 +180,16 @@ setTimeout(function() {
 
                 </div>
 
-                <div class="panel-box">
+                    <div class="panel-box">
                     <div class="panel-header-box">
-                        <div class="panel-title" id="matrixTitle">時序矩陣 (Timeline)</div>
-                        <div style="font-size: 11px; color: #6b7280;"><span style="color:#ef4444;">⬤</span> 最接近 <span style="color:#f59e0b;">●</span> 次接近 <span style="color:#64748b;">○</span> 其餘</div>
+                        <div class="panel-title" id="matrixTitle" data-i18n="engine.matrix.title">時序矩陣</div>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span style="font-size:11px;color:#38bdf8;cursor:pointer;" id="matrixCollapseToggle" onclick="toggleMatrixCollapse()">▾ 收合</span>
+                            <span style="font-size:11px;color:#6b7280;"><span style="color:#ef4444;">⬤</span> 接近 <span style="color:#f59e0b;">●</span> 次近 <span style="color:#64748b;">○</span> 其餘</span>
+                        </div>
                     </div>
 
+                    <div id="matrixCollapseBody">
                     <div id="matrixColorLegend" style="display:flex;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid #1f2937;margin-bottom:8px;min-height:20px;"></div>
 
                     <!-- Timeline GUI 時間軸（按節目分層） -->
@@ -182,11 +207,11 @@ setTimeout(function() {
                     <!-- 當前 & 下一個 Cue Point 即時看板 -->
                     <div style="display:flex; gap:0; margin:8px 0; padding:0; border-radius:6px; overflow:hidden; font-size:13px; box-shadow:0 0 12px rgba(239,68,68,0.15);">
                         <div style="flex:1; background:linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.05) 100%); border:1px solid rgba(239,68,68,0.3); padding:8px 12px;">
-                            <div style="color:#fca5a5; font-size:10px; text-transform:uppercase; letter-spacing:1px; margin-bottom:3px;">🚨 當前 Cue</div>
+                            <div style="color:#fca5a5; font-size:10px; text-transform:uppercase; letter-spacing:1px; margin-bottom:3px;" data-i18n="engine.current.cue">🚨 當前 Cue</div>
                             <div id="currentCueDisplay" style="color:#f87171; font-size:15px; font-weight:bold; font-family:monospace; text-shadow:0 0 8px rgba(239,68,68,0.4);">—</div>
                         </div>
                         <div style="flex:1; background:linear-gradient(135deg, rgba(251,191,36,0.12) 0%, rgba(251,191,36,0.04) 100%); border:1px solid rgba(251,191,36,0.25); padding:8px 12px; border-left:none;">
-                            <div style="color:#fcd34d; font-size:10px; text-transform:uppercase; letter-spacing:1px; margin-bottom:3px;">➔ 下一 Cue</div>
+                            <div style="color:#fcd34d; font-size:10px; text-transform:uppercase; letter-spacing:1px; margin-bottom:3px;" data-i18n="engine.next.cue">➔ 下一 Cue</div>
                             <div id="nextCueDisplay" style="color:#fbbf24; font-size:15px; font-weight:bold; font-family:monospace; text-shadow:0 0 8px rgba(251,191,36,0.4);">—</div>
                         </div>
                     </div>
@@ -195,32 +220,24 @@ setTimeout(function() {
                         <table class="vcc-pre-table" style="margin-bottom:0;">
                             <thead>
                                 <tr>
-                                    <th style="width:30%;">節目/廣告名稱 (Program)</th>
-                                    <th style="width:120px;">節目時段 (Prog TC)</th>
-                                    <th style="width:90px;">標籤 (Tags)</th>
-                                    <th>Cue 事件</th>
+                                    <th style="width:30%;"><span data-i18n="schedule.table.name">名稱</span></th>
+                                    <th style="width:120px;"><span data-i18n="schedule.table.start">開始</span></th>
+                                    <th style="width:90px;"><span data-i18n="schedule.table.type">類型</span></th>
+                                    <th><span data-i18n="engine.current.cue">Cue 事件</span></th>
                                     <th style="width:100px;">目標 TC</th>
-                                    <th style="width:130px;">倒數</th>
+                                    <th style="width:130px;"><span data-i18n="engine.cue.countdown">倒數</span></th>
                                 </tr>
                             </thead>
                             <tbody id="matrixTableBody">
-                                <tr><td colspan="6" style="text-align: center; color: #4b5563; padding: 30px 0;">未就緒。請先至「跨期日曆與常規編排」分頁確認交通排程，隨後點擊上方「啟動主控監測」按鈕。</td></tr>
+                                <tr><td colspan="6" style="text-align: center; color: #4b5563; padding: 30px 0;">📡 <span data-i18n="engine.matrix.title" data-i18n-target="text">時序矩陣</span></td></tr>
                             </tbody>
                         </table>
+                    </div>
                     </div>
                 </div>
             </div>
 
             <div id="page-rundown" class="page">
-
-                <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; padding:4px 10px; background:#111827; border:1px solid #1f2937; border-radius:4px; font-size:11px;">
-                    <span style="color:#64748b;">📦</span>
-                    <span id="fileStatus2" style="color:#10b981; font-weight:bold;">localStorage</span>
-                    <span style="flex:1;"></span>
-                    <span id="dataDirtyIndicator2" style="color:#10b981; font-size:10px;">✅ 自動</span>
-                    <button class="btn-ctrl btn-export-ui" onclick="saveDataToFile()" style="padding:2px 10px; font-size:10px;">⬇ 備份</button>
-                    <button class="btn-ctrl btn-import-ui" onclick="loadDataFromFile()" style="padding:2px 10px; font-size:10px;">⬆ 復原</button>
-                </div>
 
                 <div class="grid-layout-2col">
                     <div class="panel-box" style="margin-bottom: 0;">
@@ -318,6 +335,7 @@ setTimeout(function() {
                         <div class="btn-zone">
                             <button class="btn-add" id="btnSubmitForm" onclick="submitProgramForm()">儲存至編排庫 (Save Entry)</button>
                             <button class="btn-cancel" id="btnCancelEdit" onclick="exitEditMode()" style="display:none;">取消修改</button>
+                            <span id="liveEditWarn" style="display:none;font-size:10px;color:#f59e0b;align-self:center;">🔒 ENGINE LIVE — 編輯不影響播出</span>
                         </div>
                     </div>
                 </div>
@@ -337,9 +355,12 @@ setTimeout(function() {
                         <div class="panel-title" id="rundownListTitle">節目表 (Rundown)</div>
                         <div class="btn-ctrl-group">
                             <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importRundown(this)">
-                            <button class="btn-ctrl btn-import-ui" onclick="document.getElementById('importFile').click()">匯入</button>
-                            <button class="btn-ctrl btn-export-ui" onclick="exportRundown()">匯出</button>
-                            <button class="btn-ctrl btn-clear-ui" onclick="clearAllPrograms()">全清</button>
+                            <button class="btn-ctrl btn-import-ui" onclick="document.getElementById('importFile').click()" style="font-size:10px;padding:4px 8px;">匯入 (全部)</button>
+                            <button class="btn-ctrl btn-import-ui" onclick="importRundownDay()" style="font-size:10px;padding:4px 8px;">匯入 (當日)</button>
+                            <button class="btn-ctrl btn-export-ui" onclick="exportRundown('all')" style="font-size:10px;padding:4px 8px;">匯出 (全部)</button>
+                            <button class="btn-ctrl btn-export-ui" onclick="exportRundown('day')" style="font-size:10px;padding:4px 8px;">匯出 (當日)</button>
+                            <span style="width:1px;height:20px;background:#374151;margin:0 2px;"></span>
+                            <button class="btn-cancel btn-danger-action" onclick="maintenanceClearDay()" style="font-size:10px;padding:4px 8px;color:#f87171;border-color:#dc2626;">🗑 清除當日</button>
                         </div>
                     </div>
                     <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
@@ -377,7 +398,7 @@ setTimeout(function() {
                         </div>
                         <div class="input-group">
                             <label>名稱</label>
-                            <input text="text" id="presetNameField">
+                            <input type="text" id="presetNameField">
                         </div>
                         <div class="input-group">
                             <label>節點設定 (每行一個提示點)</label>
@@ -424,204 +445,207 @@ setTimeout(function() {
             </div>
 
             <div id="page-settings" class="page">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <div>
+                <div class="settings-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
+
+                    <!-- ========== LEFT COLUMN ========== -->
+                    <div class="settings-col">
+
+                        <!-- GROUP: 時間設定 (NTP + 時區 + FPS) -->
                         <div class="panel-box">
-                            <div class="panel-header-box"><div class="panel-title">🕒 NTP 時間服務</div></div>
-                            <div class="input-form" style="grid-template-columns: 1fr;">
-                                <div class="input-group">
-                                    <label>NTP 伺服器</label>
-                                    <input type="text" id="cfgNtpUrl" value="stdtime.gov.hk" onchange="saveConfig()" style="width:100%;">
-                                    <div style="font-size:11px; color:#64748b; margin-top:4px;">使用真實 NTP (UDP 123) 協定，由伺服器端 ntplib 處理</div>
-                                </div>
-                                <div class="input-group">
-                                    <label>自動同步間隔（秒）</label>
-                                    <div style="display:flex; align-items:center; gap:8px;">
-                                        <input type="number" id="cfgNtpInterval" value="600" min="0" max="86400" style="width:100px;" onchange="saveConfig(); restartAutoSync();">
-                                        <span style="font-size:11px; color:#64748b;">0 = 關閉</span>
+                            <div class="panel-header-box"><div class="panel-title">🕒 時間設定</div></div>
+                            <div style="border-bottom:1px solid #1f2937;padding-bottom:12px;margin-bottom:12px;">
+                                <div style="font-size:12px;color:#38bdf8;font-weight:bold;margin-bottom:8px;">NTP 同步</div>
+                                <div class="input-form" style="grid-template-columns:1fr;">
+                                    <div class="input-group">
+                                        <label data-i18n="settings.ntp.server">NTP 伺服器</label>
+                                        <input type="text" id="cfgNtpUrl" value="stdtime.gov.hk" onchange="saveConfig()">
+                                    </div>
+                                    <div class="input-group">
+                                        <label data-i18n="settings.ntp.interval">同步間隔（秒）</label>
+                                        <div style="display:flex;align-items:center;gap:8px;">
+                                            <input type="number" id="cfgNtpInterval" value="600" min="0" max="86400" onchange="saveConfig();restartAutoSync();">
+                                            <span style="font-size:11px;color:#64748b;">0=關閉</span>
+                                        </div>
+                                    </div>
+                                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                                        <div><span style="font-size:11px;color:#64748b;">狀態: </span><span id="settingsNtpStatus" style="font-size:12px;color:#9ca3af;">—</span></div>
+                                        <div><span style="font-size:11px;color:#64748b;">上次: </span><span id="settingsNtpLastSync" style="font-size:11px;color:#64748b;font-family:monospace;">—</span></div>
+                                        <button class="btn-start" id="btnNtpSync" onclick="handleManualNtpSync()" style="font-size:11px;padding:4px 12px;" data-i18n="settings.ntp.sync.now">🔄 同步</button>
                                     </div>
                                 </div>
-                                <div class="input-group">
-                                    <label>狀態</label>
-                                    <div id="settingsNtpStatus" style="font-size:13px; color:#9ca3af;">尚未同步</div>
-                                </div>
-                                <div class="input-group">
-                                    <label>最後同步時間</label>
-                                    <div id="settingsNtpLastSync" style="font-size:12px; color:#64748b; font-family:monospace;">—</div>
-                                </div>
-                                <div class="input-group" style="margin-top:4px;">
-                                    <button class="btn-start" id="btnNtpSync" onclick="handleManualNtpSync()" style="font-size:12px; padding:8px 16px;">🔄 立即同步</button>
+                            </div>
+                            <div style="border-bottom:1px solid #1f2937;padding-bottom:12px;margin-bottom:12px;">
+                                <div style="font-size:12px;color:#38bdf8;font-weight:bold;margin-bottom:8px;">⏱ FPS</div>
+                                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                                    <input type="number" id="cfgFrameRate" value="25" min="1" max="60" style="width:70px;" onchange="saveConfig()">
+                                    <span style="font-size:11px;color:#64748b;" data-i18n="settings.fps.hint">PAL:25 / NTSC:29.97 / 電影:24</span>
+                                    <button class="btn-sync" onclick="applyFrameRate()" style="padding:3px 10px;font-size:11px;">套用</button>
                                 </div>
                             </div>
+                            <div>
+                                <div style="font-size:12px;color:#38bdf8;font-weight:bold;margin-bottom:8px;">🌐 時區</div>
+                                <select id="cfgTimezone" onchange="saveConfig()" style="width:100%;"></select>
+                                <div style="font-size:11px;color:#64748b;margin-top:4px;" data-i18n="settings.timezone.hint">影響換日與 Cue 觸發時間</div>
+                            </div>
                         </div>
+
+                        <!-- GROUP: 音訊設定 -->
                         <div class="panel-box">
-                            <div class="panel-header-box"><div class="panel-title">🔊 音訊設定</div></div>
-                            <div class="input-form" style="grid-template-columns: 1fr;">
+                            <div class="panel-header-box"><div class="panel-title" data-i18n="settings.beep">🔊 音訊設定</div></div>
+                            <div class="input-form" style="grid-template-columns:1fr 1fr;">
                                 <div class="input-group">
-                                    <label>預設頻率 (Hz)</label>
+                                    <label data-i18n="settings.beep.freq">頻率 (Hz)</label>
                                     <input type="number" id="cfgBeepFreq" value="1500" min="400" max="4000" onchange="saveConfig()">
                                 </div>
                                 <div class="input-group">
-                                    <label>持續時間 (秒)</label>
+                                    <label data-i18n="settings.beep.dur">長度 (秒)</label>
                                     <input type="number" id="cfgBeepDur" value="0.5" step="0.1" min="0.1" max="3" onchange="saveConfig()">
                                 </div>
                             </div>
-                            <button class="btn-sync" onclick="testOscillatorSound()">🔊 測試音</button>
+                            <button class="btn-sync" onclick="testOscillatorSound()" style="margin-top:8px;">🔊 測試音</button>
                         </div>
-                    </div>
-                    <div class="panel-box" style="margin-top:15px;">
-                        <div class="panel-header-box"><div class="panel-title">⏱ FPS 設定</div></div>
-                        <div class="input-form" style="grid-template-columns: 1fr;">
-                            <div class="input-group">
-                                <label>FPS</label>
-                                <div style="display:flex; align-items:center; gap:8px;">
-                                    <input type="number" id="cfgFrameRate" value="25" min="1" max="60" style="width:80px;">
-                                    <span style="font-size:11px; color:#64748b;">PAL: 25 / NTSC: 29.97 / 電影: 24</span>
-                                    <button class="btn-sync" onclick="applyFrameRate()" style="padding:4px 10px; font-size:11px;">套用</button>
-                                </div>
-                                <div style="font-size:11px; color:#64748b; margin-top:4px;">⚠️ 需重啟 ENGINE</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="panel-box" style="margin-top:15px;">
-                        <div class="panel-header-box"><div class="panel-title">🌐 時區</div></div>
-                        <div class="input-form" style="grid-template-columns: 1fr;">
-                            <div class="input-group">
-                                <label>時區</label>
-                                <select id="cfgTimezone" onchange="saveConfig()" style="width:100%;"></select>
-                                <div style="font-size:11px; color:#64748b; margin-top:4px;">影響換日與 Cue 觸發時間</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="panel-box" style="margin-top:15px;">
-                        <div class="panel-header-box"><div class="panel-title">🗑️ 保留原則</div></div>
-                        <div class="input-form" style="grid-template-columns: 1fr;">
-                            <div class="input-group">
-                                <label>Cue 保留秒數</label>
-                                <div style="display:flex; align-items:center; gap:8px;">
-                                    <input type="number" id="cfgRetentionSec" value="5" min="0" max="60" style="width:80px;" onchange="saveConfig()">
-                                    <span style="font-size:11px; color:#64748b;">秒</span>
-                                </div>
-                                <div style="font-size:11px; color:#64748b; margin-top:4px;">觸發後在矩陣中保留多久</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div>
+
+                        <!-- GROUP: 介面設定 (語言 + 保留原則) -->
                         <div class="panel-box">
-                            <div class="panel-header-box"><div class="panel-title">⚙️ Config 檔</div></div>
-                            <div style="font-size:11px; color:#9ca3af; margin-bottom:6px;">所有設定 JSON</div>
-                            <textarea id="configJsonArea" style="width:100%; height:90px; background:#030712; border:1px solid #374151; color:#a7f3d0; padding:6px; font-family:monospace; font-size:11px; border-radius:4px; resize:vertical; margin-bottom:6px;"></textarea>
-                            <div class="btn-zone" style="gap:6px;">
-                                <button class="btn-ctrl btn-export-ui" style="font-size:10px; padding:4px 8px;" onclick="refreshConfigJsonArea()">🔄 刷新</button>
-                                <button class="btn-add" style="font-size:10px; padding:4px 8px; background-color:#10b981;" onclick="applyConfigJson()">套用</button>
-                                <button class="btn-sync" style="font-size:10px; padding:4px 8px;" onclick="exportConfigAsJson()">下載</button>
-                                <input type="file" id="configImportFile" accept=".json" style="display:none;" onchange="importConfigFromFile(this)">
-                                <button class="btn-ctrl btn-import-ui" style="font-size:10px; padding:4px 8px;" onclick="document.getElementById('configImportFile').click()">匯入</button>
-                                <button class="btn-cancel btn-danger-action" style="font-size:10px; padding:4px 8px;" onclick="factoryResetStorage()">🚨 重置</button>
-                                <button class="btn-ctrl btn-export-ui" style="font-size:10px; padding:4px 8px;" onclick="saveDataToFile()">⬇ 備份</button>
-                                <button class="btn-ctrl btn-import-ui" style="font-size:10px; padding:4px 8px;" onclick="loadDataFromFile()">⬆ 復原</button>
+                            <div class="panel-header-box"><div class="panel-title">🌐 介面設定</div></div>
+                            <div style="border-bottom:1px solid #1f2937;padding-bottom:12px;margin-bottom:12px;">
+                                <div style="font-size:12px;color:#38bdf8;font-weight:bold;margin-bottom:8px;">語言 / Language</div>
+                                <select id="cfgLanguage" onchange="switchLanguage(this.value)" style="width:100%;">
+                                    <option value="zh">中文 (繁體)</option>
+                                    <option value="en">English</option>
+                                </select>
                             </div>
-                        </div>
-                        <div class="panel-box" style="margin-top:15px;">
-                            <div class="panel-header-box"><div class="panel-title">🚑 Crash Dump</div></div>
-                            <div style="font-size:11px; color:#9ca3af; margin-bottom:6px;">系統狀態報告</div>
-                            <textarea id="crashDumpArea" style="width:100%; height:100px; background:#030712; border:1px solid #374151; color:#a7f3d0; padding:6px; font-family:monospace; font-size:11px; border-radius:4px; resize:vertical; margin-bottom:6px;"></textarea>
-                            <div class="btn-zone" style="gap:6px;">
-                                <button class="btn-ctrl btn-export-ui" style="font-size:10px; padding:4px 8px;" onclick="generateCrashDump()">📋 生成</button>
-                                <button class="btn-sync" style="font-size:10px; padding:4px 8px;" onclick="saveCrashDumpToFile()">⬇ 下載</button>
-                            </div>
-                        </div>
-                        <div class="panel-box" style="margin-top:15px;">
-                            <div class="panel-header-box">
-                                <div class="panel-title">📋 伺服器日誌 (Server Log)</div>
-                                <div style="display:flex; gap:4px;">
-                                    <button class="btn-ctrl btn-export-ui" id="btnFetchServerLog" onclick="fetchServerLog()" style="padding:2px 8px; font-size:10px;">🔄 刷新</button>
-                                    <button class="btn-ctrl btn-export-ui" onclick="downloadServerLog()" style="padding:2px 8px; font-size:10px;">⬇ 匯出</button>
+                            <div>
+                                <div style="font-size:12px;color:#38bdf8;font-weight:bold;margin-bottom:8px;" data-i18n="settings.retention">🗑️ 保留原則</div>
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <label style="font-size:12px;color:#9ca3af;white-space:nowrap;" data-i18n="settings.retention">Cue 保留</label>
+                                    <input type="number" id="cfgRetentionSec" value="5" min="0" max="60" style="width:60px;" onchange="saveConfig()">
+                                    <span style="font-size:11px;color:#64748b;" data-i18n="settings.retention.hint">秒</span>
                                 </div>
                             </div>
-                            <div style="font-size:11px; color:#9ca3af; margin-bottom:6px;">由後端記錄，24h 自動輪換</div>
-                            <textarea id="serverLogArea" readonly style="width:100%; height:160px; background:#030712; border:1px solid #374151; color:#a7f3d0; padding:6px; font-family:monospace; font-size:11px; border-radius:4px; resize:vertical; margin-bottom:4px;"></textarea>
-                            <div style="font-size:11px; color:#4b5563; text-align:right;"><span id="serverLogLines">0</span> 行</div>
                         </div>
-                        <div class="panel-box" style="margin-top:15px;">
-                            <div class="panel-header-box"><div class="panel-title">⚡ 開發者選項</div></div>
-                            <div class="input-form" style="grid-template-columns: 1fr;">
-                                <div class="input-group">
-                                    <label>Engine 間隔 (ms)</label>
-                                    <div style="display:flex; align-items:center; gap:8px;">
-                                        <input type="number" id="devEngineInterval" value="40" min="10" max="1000" style="width:80px;">
-                                        <button class="btn-sync" onclick="applyDevEngineInterval()" style="padding:4px 10px; font-size:11px;">套用</button>
+                    </div>
+
+                    <!-- ========== RIGHT COLUMN ========== -->
+                    <div class="settings-col">
+
+                        <!-- GROUP: Config + Backup + Inspector -->
+                        <div class="panel-box">
+                            <div class="panel-header-box"><div class="panel-title">📦 資料管理</div></div>
+                            <div style="border-bottom:1px solid #1f2937;padding-bottom:10px;margin-bottom:10px;">
+                                <div style="font-size:12px;color:#38bdf8;font-weight:bold;margin-bottom:6px;">⚙️ Config JSON</div>
+                                <textarea id="configJsonArea" style="width:100%;height:60px;background:#030712;border:1px solid #374151;color:#a7f3d0;padding:6px;font-family:monospace;font-size:11px;border-radius:4px;resize:vertical;margin-bottom:6px;"></textarea>
+                                <div class="btn-zone" style="gap:4px;flex-wrap:wrap;">
+                                    <button class="btn-ctrl btn-export-ui" onclick="refreshConfigJsonArea()">刷新</button>
+                                    <button class="btn-add" style="background-color:#10b981;" onclick="applyConfigJson()">套用</button>
+                                    <button class="btn-sync" onclick="exportConfigAsJson()">下載</button>
+                                    <input type="file" id="configImportFile" accept=".json" style="display:none;" onchange="importConfigFromFile(this)">
+                                    <button class="btn-ctrl btn-import-ui" onclick="document.getElementById('configImportFile').click()">匯入</button>
+                                    <button class="btn-cancel btn-danger-action" onclick="factoryResetStorage()">重置</button>
+                                    <button class="btn-ctrl btn-export-ui" onclick="saveDataToFile()">備份</button>
+                                    <button class="btn-ctrl btn-import-ui" onclick="loadDataFromFile()">復原</button>
+                                </div>
+                            </div>
+                            <div style="border-bottom:1px solid #1f2937;padding-bottom:10px;margin-bottom:10px;">
+                                <div style="font-size:12px;color:#38bdf8;font-weight:bold;margin-bottom:6px;">📦 JSON Inspector</div>
+                                <textarea id="debugStateTextArea" style="width:100%;height:80px;background:#030712;border:1px solid #374151;color:#a7f3d0;padding:6px;font-family:monospace;font-size:11px;border-radius:4px;resize:vertical;margin-bottom:6px;"></textarea>
+                                <div class="btn-zone" style="gap:4px;">
+                                    <button class="btn-update" onclick="applyInjectedJsonState()">注入套用</button>
+                                    <button class="btn-sync" onclick="refreshJsonInspectorProbe()">刷新</button>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="font-size:12px;color:#ef4444;font-weight:bold;margin-bottom:6px;">⚠️ 維護</div>
+                                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                    <button class="btn-cancel btn-danger-action" onclick="maintenanceClearDay()" style="font-size:11px;padding:6px 14px;">🗑 清除當日排程</button>
+                                    <button class="btn-cancel btn-danger-action" onclick="maintenanceClearAll()" style="font-size:11px;padding:6px 14px;border-color:#dc2626;">🚨 清除全部排程</button>
+                                </div>
+                                <div style="font-size:10px;color:#64748b;margin-top:4px;">清除當日：單次刪除+週期跳過 ｜ 清除全部：刪除所有節目記錄</div>
+                            </div>
+                        </div>
+
+                        <!-- GROUP: 開發者 + Crash Dump -->
+                        <div class="panel-box">
+                            <div class="panel-header-box"><div class="panel-title">🔧 開發者除錯</div></div>
+                            <div style="border-bottom:1px solid #1f2937;padding-bottom:10px;margin-bottom:10px;">
+                                <div style="font-size:12px;color:#38bdf8;font-weight:bold;margin-bottom:6px;">⚡ 選項</div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                                    <div><label style="font-size:11px;color:#9ca3af;">Engine 間隔</label><br><input type="number" id="devEngineInterval" value="40" min="10" max="1000" style="width:60px;"><button class="btn-sync" onclick="applyDevEngineInterval()" style="padding:2px 8px;font-size:10px;margin-left:4px;">套用</button></div>
+                                    <div><label style="font-size:11px;color:#9ca3af;">Log 行數</label><br><input type="number" id="devLogLines" value="200" min="10" max="5000" onchange="applyDevLogLines()" style="width:60px;"></div>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
+                                    <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="devVerboseLog" onchange="applyDevVerboseLog()"> 詳細 Log</label>
+                                    <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="devDebugLayout" onchange="applyDevDebugLayout()"> 佈局邊框</label>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="font-size:12px;color:#38bdf8;font-weight:bold;margin-bottom:6px;">🚑 Crash Dump</div>
+                                <textarea id="crashDumpArea" style="width:100%;height:60px;background:#030712;border:1px solid #374151;color:#a7f3d0;padding:6px;font-family:monospace;font-size:11px;border-radius:4px;resize:vertical;margin-bottom:6px;"></textarea>
+                                <div class="btn-zone" style="gap:4px;">
+                                    <button class="btn-ctrl btn-export-ui" onclick="generateCrashDump()">📋 生成</button>
+                                    <button class="btn-sync" onclick="saveCrashDumpToFile()">⬇ 下載</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- GROUP: 日誌 (伺服器 + 用戶端) -->
+                        <div class="panel-box">
+                            <div class="panel-header-box"><div class="panel-title">📋 日誌</div></div>
+                            <div style="border-bottom:1px solid #1f2937;padding-bottom:10px;margin-bottom:10px;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                                    <span style="font-size:12px;color:#38bdf8;font-weight:bold;">伺服器日誌</span>
+                                    <div style="display:flex;gap:4px;">
+                                        <button class="btn-ctrl btn-export-ui" id="btnFetchServerLog" onclick="fetchServerLog()" style="padding:2px 8px;font-size:10px;">刷新</button>
+                                        <button class="btn-ctrl btn-export-ui" onclick="downloadServerLog()" style="padding:2px 8px;font-size:10px;">匯出</button>
                                     </div>
-                                    <div style="font-size:11px; color:#64748b; margin-top:2px;">⚠️ 低於 30ms 可能影響效能，需重啟 ENGINE 生效</div>
                                 </div>
-                                <div class="input-group">
-                                    <label>Log 保留行數</label>
-                                    <input type="number" id="devLogLines" value="200" min="10" max="5000" onchange="applyDevLogLines()" style="width:80px;">
-                                </div>
-                                <div class="input-group">
-                                    <label>除錯模式</label>
-                                    <div style="display:flex; align-items:center; gap:12px;">
-                                        <label style="display:flex; align-items:center; gap:4px;cursor:pointer;"><input type="checkbox" id="devVerboseLog" onchange="applyDevVerboseLog()"> 詳細 Log</label>
-                                        <label style="display:flex; align-items:center; gap:4px;cursor:pointer;"><input type="checkbox" id="devDebugLayout" onchange="applyDevDebugLayout()"> 顯示佈局邊框</label>
+                                <textarea id="serverLogArea" readonly style="width:100%;height:80px;background:#030712;border:1px solid #374151;color:#a7f3d0;padding:6px;font-family:monospace;font-size:11px;border-radius:4px;resize:vertical;margin-bottom:4px;"></textarea>
+                                <div style="font-size:10px;color:#4b5563;text-align:right;"><span id="serverLogLines">0</span> 行</div>
+                            </div>
+                            <div>
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                                    <span style="font-size:12px;color:#38bdf8;font-weight:bold;">用戶端日誌 (Console)</span>
+                                    <div style="display:flex;gap:4px;">
+                                        <button class="btn-ctrl btn-export-ui" onclick="exportClientLog()" style="padding:2px 8px;font-size:10px;">匯出</button>
+                                        <button class="btn-ctrl btn-import-ui" onclick="document.getElementById('consoleTerminal').innerHTML='';" style="padding:2px 8px;font-size:10px;">清除</button>
                                     </div>
                                 </div>
+                                <div id="consoleScrollLock" style="display:none;font-size:10px;color:#f59e0b;text-align:right;padding:2px 6px;background:#111827;border-bottom:1px solid #1f2937;cursor:pointer;" onclick="var e=document.getElementById('consoleTerminal');e.scrollTop=e.scrollHeight;this.style.display='none';">⬆ 自動滾動已鎖定 — 點擊恢復</div>
+                                <div class="console-terminal" id="consoleTerminal" style="height:100px;"></div>
                             </div>
                         </div>
-                        <div class="panel-box" style="margin-top:15px;">
-                            <div class="panel-header-box"><div class="panel-title">記憶體狀態探針 (Rundown JSON Inspector)</div></div>
-                            <div class="input-group">
-                                <textarea id="debugStateTextArea" style="height: 140px; font-size: 11px; color: #a7f3d0; background:#030712; border: 1px solid #374151; padding: 10px; font-family: monospace; resize: none;"></textarea>
+
+                        <!-- GROUP: 診斷 (健康 + 診斷 + ENGINE 記錄) -->
+                        <div class="panel-box">
+                            <div class="panel-header-box"><div class="panel-title">🩺 診斷</div></div>
+                            <div style="border-bottom:1px solid #1f2937;padding-bottom:10px;margin-bottom:10px;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                                    <span style="font-size:12px;color:#38bdf8;font-weight:bold;">系統健康</span>
+                                    <button class="btn-ctrl btn-export-ui" onclick="refreshHealthPanel()" style="padding:2px 8px;font-size:10px;">刷新</button>
+                                </div>
+                                <div id="healthPanelContent" style="font-size:11px;font-family:monospace;line-height:1.6;">
+                                    <div style="color:#64748b;text-align:center;padding:6px 0;">點擊刷新</div>
+                                </div>
                             </div>
-                            <div class="btn-zone" style="margin-top: 8px;">
-                                <button class="btn-update" style="padding: 6px 12px;" onclick="applyInjectedJsonState()">注入並套用原始 JSON 變更</button>
-                                <button class="btn-sync" style="padding: 6px 12px;" onclick="refreshJsonInspectorProbe()">刷新探針</button>
+                            <div style="border-bottom:1px solid #1f2937;padding-bottom:10px;margin-bottom:10px;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                                    <span style="font-size:12px;color:#38bdf8;font-weight:bold;">🔍 一鍵診斷</span>
+                                    <button class="btn-start" onclick="runSystemDiagnosis()" style="font-size:10px;padding:3px 10px;">▶ 執行</button>
+                                </div>
+                                <div id="diagnosisResult" style="font-size:11px;font-family:monospace;line-height:1.6;">
+                                    <div style="color:#64748b;text-align:center;padding:6px 0;">點擊執行</div>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                                    <span style="font-size:12px;color:#38bdf8;font-weight:bold;">📜 ENGINE 觸發記錄</span>
+                                    <button class="btn-ctrl btn-export-ui" onclick="showTriggerHistory()" style="padding:2px 8px;font-size:10px;">檢視</button>
+                                </div>
+                                <div style="font-size:11px;color:#64748b;">最近觸發的 Cue 點<span id="triggerHistoryCount" style="margin-left:8px;color:#9ca3af;"></span></div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- ENGINE 觸發記錄 -->
-                    <div class="panel-box">
-                        <div class="panel-header-box">
-                            <div class="panel-title">📜 ENGINE 觸發記錄</div>
-                            <button class="btn-ctrl btn-export-ui" onclick="showTriggerHistory()" style="padding:3px 10px; font-size:10px;">📜 檢視</button>
-                        </div>
-                        <div style="font-size:11px; color:#64748b;">顯示最近觸發的 Cue 點記錄<span id="triggerHistoryCount" style="margin-left:8px; color:#9ca3af;"></span></div>
-                    </div>
-
-                    <!-- 系統日誌 (Console) -->
-                    <div class="panel-box">
-                        <div class="panel-header-box">
-                            <div class="panel-title">系統日誌 (Console)</div>
-                            <div style="display:flex; gap:4px;">
-                                <button class="btn-ctrl btn-export-ui" onclick="exportClientLog()" style="padding:2px 8px; font-size:10px;">📋 匯出日誌</button>
-                                <button class="btn-ctrl btn-import-ui" onclick="document.getElementById('consoleTerminal').innerHTML='';" style="padding:2px 8px; font-size:10px;">🗑 清除</button>
-                            </div>
-                        </div>
-                                                <div id="consoleScrollLock" class="console-scroll-lock" style="display:none;font-size:10px;color:#f59e0b;text-align:right;padding:2px 6px;background:#111827;border-bottom:1px solid #1f2937;cursor:pointer;" onclick="document.getElementById('consoleTerminal').scrollTop = document.getElementById('consoleTerminal').scrollHeight;this.style.display='none';">⬆ 自動滾動已鎖定 — 點擊恢復</div>
-                        <div class="console-terminal" id="consoleTerminal"></div><div class="console-terminal" id="consoleTerminal"></div>
-                    </div>
-
-                    <!-- 系統健康面板 -->
-                    <div class="panel-box">
-                        <div class="panel-header-box">
-                            <div class="panel-title">🩺 系統健康</div>
-                            <button class="btn-ctrl btn-export-ui" onclick="refreshHealthPanel()" style="padding:2px 8px;font-size:10px;">🔄 刷新</button>
-                        </div>
-                        <div id="healthPanelContent" style="font-size:12px;font-family:monospace;line-height:1.8;">
-                            <div style="color:#64748b;text-align:center;padding:10px 0;">點擊「刷新」查看模組狀態</div>
-                        </div>
-                    </div>
-
-                    <!-- 一鍵診斷面板 -->
-                    <div class="panel-box">
-                        <div class="panel-header-box">
-                            <div class="panel-title">🔍 一鍵系統診斷</div>
-                            <button class="btn-start" onclick="runSystemDiagnosis()" style="font-size:11px;padding:4px 12px;">▶ 執行</button>
-                        </div>
-                        <div id="diagnosisResult" style="font-size:12px;font-family:monospace;line-height:1.8;">
-                            <div style="color:#64748b;text-align:center;padding:10px 0;">點擊「執行」開始測試</div>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -634,6 +658,26 @@ setTimeout(function() {
                     </div>
                     <div id="triggerHistoryList" style="flex:1; overflow-y:auto; padding:12px 20px; font-size:12px; font-family:monospace; line-height:1.8;">
                         <div style="color:#64748b; text-align:center; padding:30px 0;">尚無觸發記錄</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 通知 Modal -->
+            <div id="notifyModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;" onclick="if(event.target===this)closeNotifyDialog()">
+                <div style="background:#111827;border:1px solid #1f2937;border-radius:10px;width:90%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #1f2937;">
+                        <div style="font-size:14px;color:#38bdf8;font-weight:bold;">🔊 發送通知</div>
+                        <button onclick="closeNotifyDialog()" style="background:transparent;color:#9ca3af;font-size:18px;border:none;cursor:pointer;">✕</button>
+                    </div>
+                    <div style="padding:16px 18px;">
+                        <div style="font-size:11px;color:#64748b;margin-bottom:8px;">選擇通知模板或自訂訊息：</div>
+                        <div id="notifyTemplateList" style="display:flex;flex-direction:column;gap:6px;"></div>
+                        <textarea id="notifyCustomMsg" style="width:100%;height:60px;background:#090d16;border:1px solid #374151;color:#fff;padding:8px;font-size:12px;border-radius:4px;resize:vertical;margin-top:8px;font-family:inherit;" placeholder="或在此輸入自訂訊息..."></textarea>
+                        <div style="display:flex;gap:8px;margin-top:10px;">
+                            <button class="btn-start" onclick="sendNotifyMessage()" style="font-size:12px;padding:8px 20px;">📤 發送</button>
+                            <button class="btn-cancel" onclick="closeNotifyDialog()" style="font-size:12px;padding:8px 20px;">取消</button>
+                            <span id="notifyStatus" style="font-size:11px;color:#64748b;margin-left:8px;align-self:center;"></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -685,6 +729,9 @@ setTimeout(function() {
                             <li><kbd>Space</kbd> — 切換 ENGINE 啟動/停止</li>
                             <li><kbd>Ctrl+1</kbd>～<kbd>6</kbd> — 切換分頁</li>
                             <li><kbd>Ctrl+S</kbd> — 儲存 Preset（Preset 頁面）</li>
+                            <li><kbd>Escape</kbd> — 關閉彈窗/Modal/Toast</li>
+                            <li><kbd>N</kbd> — 新增節目（排程頁）</li>
+                            <li><kbd>F</kbd> — 焦點搜尋列（排程頁）</li>
                         </ul>
                         <div class="tip">💡 滑鼠懸停在矩陣 Cue 點上可查看詳細資訊。</div>
                     </div>
@@ -751,6 +798,8 @@ setTimeout(function() {
 <script src="/static/clipper-chat-module.js"></script>
 <script src="/static/clipper-files-module.js"></script>
 <script src="/static/county-core.js"></script>
+<script src="/static/county-i18n.js"></script>
+<script src="/static/county-i18n-en.js"></script>
 <!-- 後續模組將插入此處 -->
 <script src="/static/county-helpers.js"></script>
 <script src="/static/county-config.js"></script>
@@ -801,6 +850,38 @@ setTimeout(function() {
     // frameRate / isTrackingActive / timerInterval / audioCtx
     // ============================================================================
 
+    // ===== AbortSignal.timeout polyfill (for older browsers/PyInstaller) =====
+    if (!AbortSignal.timeout) {
+        AbortSignal.timeout = function(ms) {
+            var ctrl = new AbortController();
+            setTimeout(function() { ctrl.abort(); }, ms);
+            return ctrl.signal;
+        };
+    }
+
+    // ===== Clipper transport UI stub（由 clipper 模組調用） =====
+    if (typeof window.updateTransportUI !== 'function') {
+        window.updateTransportUI = function() {};
+    }
+
+    // ===== 安全 localStorage 寫入（配額不足時警告） =====
+    function safeSetItem(key, val) {
+        try {
+            localStorage.setItem(key, val);
+        } catch(e) {
+            if (e.name === 'QuotaExceededError' || e.code === 22) {
+                showToast('⚠️ 瀏覽器儲存空間不足，部分資料可能無法保存', 'error');
+                writeLog('⚠️ localStorage quota exceeded for key: ' + key, 'error');
+            }
+        }
+    }
+
+    // ===== HTML 跳脫工具（防 XSS） =====
+    function h(str) {
+        if (str == null) return '';
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
     // ===== 資料儲存（同步 localStorage） =====
     
     function getDataSet() {
@@ -838,11 +919,9 @@ setTimeout(function() {
 
     function markDirty() {
         // 同步儲存到 localStorage（單一寫入點）
-        try {
-            localStorage.setItem('county_presets_v8', JSON.stringify(cuePresets));
-            localStorage.setItem('county_master_db_v8', JSON.stringify(masterScheduleDB));
-            localStorage.setItem('county_config_v8', JSON.stringify(appConfig || {}));
-        } catch(e) {}
+        safeSetItem('county_presets_v8', JSON.stringify(cuePresets));
+        safeSetItem('county_master_db_v8', JSON.stringify(masterScheduleDB));
+        safeSetItem('county_config_v8', JSON.stringify(appConfig || {}));
         const indicator = document.getElementById('dataDirtyIndicator');
         if (indicator) indicator.innerText = '✅ 已儲存';
         refreshJsonInspectorProbe();
@@ -896,10 +975,12 @@ setTimeout(function() {
     function handleFileOpen(input) {
         const file = input.files[0];
         if (!file) return;
+        showToast("⏳ 正在還原備份...", "info");
         // Try API restore first; fallback to localStorage import
         API.restoreBackup(file).then(function(result) {
             if (result && result.status === 'ok') {
                 updateFileStatus('☁️ 伺服器');
+                showToast("✅ 雲端還原備份成功", "success");
                 writeLog('✅ 雲端還原備份成功', 'success');
                 // Reload from API
                 API.loadSchedules().then(function(apiData) {
@@ -984,7 +1065,7 @@ setTimeout(function() {
         lastSyncTime: null,     // ISO string or null
         errorMsg: '',
         config: {
-            ntpServerUrl: 'https://worldtimeapi.org/api/timezone/Asia/Hong_Kong',
+            ntpServerUrl: 'stdtime.gov.hk',
             ntpAutoSyncInterval: 0,   // seconds, 0=disabled
         },
         timerId: null,          // auto-sync interval ID
@@ -1121,6 +1202,7 @@ setTimeout(function() {
             ntpLastOffset: 0,
             ntpLastSyncTime: '',
             presetProtection: true,
+            language: 'zh',
             version: 3
         };
     }
@@ -1138,6 +1220,8 @@ setTimeout(function() {
         appConfig.retentionSeconds = parseInt(document.getElementById('cfgRetentionSec').value) || 5;
         appConfig.presetProtection = document.getElementById('cfgPresetProtection').checked;
         appConfig.lastSelectedDate = document.getElementById('globalTargetDate').value;
+        var langEl = document.getElementById('cfgLanguage');
+        if (langEl) appConfig.language = langEl.value;
         const ntpUrlInput = document.getElementById('cfgNtpUrl');
         const ntpIntervalInput = document.getElementById('cfgNtpInterval');
         if (ntpUrlInput) {
@@ -1152,7 +1236,7 @@ setTimeout(function() {
         appConfig.ntpAutoSyncInterval = NTPManager.config.ntpAutoSyncInterval;
         appConfig.ntpLastOffset = NTPManager.offset;
         appConfig.ntpLastSyncTime = NTPManager.lastSyncTime || '';
-        localStorage.setItem('county_config_v8', JSON.stringify(appConfig));
+        safeSetItem('county_config_v8', JSON.stringify(appConfig));
         // Debounce server sync: localStorage writes immediately, API call waits 2s after last change
         if (window._saveConfigTimer) clearTimeout(window._saveConfigTimer);
         window._saveConfigTimer = setTimeout(function() {
@@ -1179,6 +1263,14 @@ setTimeout(function() {
         if (retEl) retEl.value = appConfig.retentionSeconds || 5;
         const pEl = document.getElementById('cfgPresetProtection');
         if (pEl) pEl.checked = appConfig.presetProtection !== false;
+        const langEl = document.getElementById('cfgLanguage');
+        if (langEl && appConfig.language) {
+            langEl.value = appConfig.language;
+            // 套用儲存的語系到 UI（若與預設不同）
+            if (appConfig.language !== 'zh' && typeof switchLanguage === 'function') {
+                switchLanguage(appConfig.language);
+            }
+        }
         timelineRange.maxFrames = 86400 * frameRate;
         const fpsLabel = document.getElementById('sidebarFpsLabel');
         if (fpsLabel) fpsLabel.innerText = frameRate + ' fps';
@@ -1611,6 +1703,10 @@ setTimeout(function() {
         // 跨頁面 CUE 引擎：由 _masterTimer/masterTick 統一處理，無需重建
         if (pageId === 'live' && isTrackingActive) {
             adjustMatrixHeight();
+            // 強制刷新儀表板（清除快取 + 重算矩陣）
+            window.__liveUI_matrixRowCache = null;
+            window.__liveUI_lastMatrixRender = 0;
+            calculateGlobalTimelineMatrix(true);
         }
 
         // 手機版自動收起側欄
@@ -1707,7 +1803,7 @@ setTimeout(function() {
                 if (p.tags && p.tags.length > 0) {
                     tagHtml = '<div class="wp-tags">' + p.tags.map(function(t) { return '<span class="tag-badge" style="background:#1f2937;color:#e2e8f0;">' + t + '</span>'; }).join('') + '</div>';
                 }
-                block.innerHTML = '<div class="wp-time">' + p.startTime.substring(0,5) + ' - ' + p.duration.substring(0,5) + '</div><div class="wp-name">' + p.name + '</div>' + tagHtml;
+                block.innerHTML = '<div class="wp-time">' + h(p.startTime.substring(0,5)) + ' - ' + h(p.duration.substring(0,5)) + '</div><div class="wp-name">' + h(p.name) + '</div>' + tagHtml;
                 block.onclick = function(e) {
                     e.stopPropagation();
                     enterEditMode(this.dataset.progId);
@@ -1718,6 +1814,7 @@ setTimeout(function() {
                 const empty = document.createElement('div');
                 empty.style.cssText = 'color:#374151; font-size:9px; text-align:center; padding-top:20px;';
                 empty.innerText = '—';
+                empty.title = '此日無排程節目';
                 cell.appendChild(empty);
             }
             container.appendChild(cell);
@@ -1757,6 +1854,10 @@ setTimeout(function() {
             return prog.broadcastDate === targetDateStr;
         }
         if (prog.periodicEndDate && targetDateStr > prog.periodicEndDate) return false;
+        // 檢查例外跳過日期
+        var excDates = prog.exceptionDates || prog.exception_dates || [];
+        if (typeof excDates === 'string') try { excDates = JSON.parse(excDates); } catch(e) { excDates = []; }
+        if (excDates.indexOf(targetDateStr) >= 0) return false;
 
         const targetDateObj = new Date(targetDateStr);
         const dayOfWeek = targetDateObj.getDay();
@@ -2088,10 +2189,6 @@ setTimeout(function() {
         syncWithNetworkTime(function() {
             updateNtpStatusUI();
             restartAutoSync();
-        });        // NTP 時間同步（非阻塞，保留現有 offset）
-        syncWithNetworkTime(function() {
-            updateNtpStatusUI();
-            restartAutoSync();
             // Hide NTP loading indicator when sync completes
             var ntpLoadEl = document.getElementById('ntpLoadingIndicator');
             if (ntpLoadEl) ntpLoadEl.style.display = 'none';
@@ -2103,10 +2200,166 @@ setTimeout(function() {
             if (ntpLoadEl) ntpLoadEl.style.display = 'none';
         }, 5000);
 
+        // 鍵盤快捷鍵
+        document.addEventListener('keydown', function(e) {
+            // Escape 關閉所有 Modal
+            if (e.key === 'Escape') {
+                var modals = ['triggerHistoryModal'];
+                modals.forEach(function(id) {
+                    var el = document.getElementById(id);
+                    if (el && el.style.display !== 'none') {
+                        if (typeof closeTriggerHistory === 'function') closeTriggerHistory();
+                    }
+                });
+                var toast = document.querySelector('.county-toast');
+                if (toast) toast.remove();
+                var cuePopup = document.getElementById('cuePopup');
+                if (cuePopup && cuePopup.style.display !== 'none') cuePopup.style.display = 'none';
+            }
+            // Ctrl+1..6 切換分頁（已在說明文件提及）
+            if (e.ctrlKey && e.key >= '1' && e.key <= '6') {
+                e.preventDefault();
+                var pages = ['live','rundown','preset','settings','clipper','changelog'];
+                var idx = parseInt(e.key) - 1;
+                if (pages[idx]) switchPage(pages[idx]);
+            }
+            // Ctrl+S 儲存 Preset（Preset 頁面）
+            if (e.ctrlKey && e.key === 's') {
+                var presetPage = document.getElementById('page-preset');
+                if (presetPage && presetPage.classList.contains('active')) {
+                    e.preventDefault();
+                    if (typeof savePresetAction === 'function') savePresetAction();
+                }
+            }
+            // N 新增節目（排程頁）
+            if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                var rundownPage = document.getElementById('page-rundown');
+                if (rundownPage && rundownPage.classList.contains('active')) {
+                    e.preventDefault();
+                    if (typeof exitEditMode === 'function') exitEditMode();
+                }
+            }
+            // F 焦點搜尋列（排程頁）
+            if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                var rundownPage = document.getElementById('page-rundown');
+                if (rundownPage && rundownPage.classList.contains('active')) {
+                    e.preventDefault();
+                    var sb = document.getElementById('searchRundown');
+                    if (sb) sb.focus();
+                }
+            }
+        });
+
         // Create single master timer — handles clock + engine in one tick
-        function masterTick() {
-            refreshClockOnly();                             // always update clock
+        // 狀態列更新（非引擎也可執行）
+        function updateStatusBarLine() {
+            var bar = document.getElementById('statusBarLine');
+            if (!bar) return;
+            if (!isTrackingActive) {
+                bar.style.background = '#4b5563'; // 灰色 = 引擎關閉
+                return;
+            }
+            var now = getCalibratedDate();
+            var cf = timecodeToTotalFrames(dateToTimecode(now));
+            var ret = getRetentionFrames();
+            var hasActive = (globalTriggers || []).some(function(t) { return !t.triggered && t.targetFrames - cf <= 0 && t.targetFrames - cf > -ret; });
+            var hasImminent = (globalTriggers || []).some(function(t) { return !t.triggered && t.targetFrames - cf > 0 && t.targetFrames - cf <= 30 * frameRate; });
+            if (hasActive) bar.style.background = '#ef4444';      // 紅色 = Cue 觸發中
+            else if (hasImminent) bar.style.background = '#f59e0b'; // 黃色 = Cue 即將到來
+            else bar.style.background = '#22c55e';                // 綠色 = 正常
+        }
+        // 輕量版倒數更新（跨頁面執行，不涉及矩陣 DOM）
+        function updateCountdownsOnly() {
             if (!isTrackingActive) return;
+            try {
+                var now = getCalibratedDate();
+                var cf = timecodeToTotalFrames(dateToTimecode(now));
+                var targetDateStr = document.getElementById('globalTargetDate').value;
+                var activeList = getExpandedRundownForDate(targetDateStr);
+                var fr = frameRate || 25;
+                var onAir = null, nextUp = null;
+                activeList.forEach(function(p) {
+                    var sf = timecodeToTotalFrames(p.startTime), ef = sf + timecodeToTotalFrames(p.duration);
+                    if (cf >= sf && cf <= ef) onAir = p;
+                    else if (sf > cf && !nextUp) nextUp = p;
+                });
+                // ON AIR card
+                var mcrCard = document.getElementById('mcrOnAirCard');
+                var mcrLiveTag = document.getElementById('mcrLiveTag');
+                if (mcrCard && mcrLiveTag) {
+                    if (onAir) {
+                        mcrCard.classList.remove('no-active');
+                        mcrLiveTag.style.display = 'block';
+                        document.getElementById('mcrOnAirTitle').innerText = onAir.name;
+                        var rem = Math.ceil(Math.max(0, timecodeToTotalFrames(onAir.startTime) + timecodeToTotalFrames(onAir.duration) - cf) / fr);
+                        document.getElementById('mcrOnAirCountdown').innerText = "⏳ " + _t('engine.cue.countdown') + ": " + (Math.floor(rem/60) > 0 ? Math.floor(rem/60) + "m " : "") + (rem%60) + "s";
+                    } else {
+                        mcrCard.classList.add('no-active');
+                        mcrLiveTag.style.display = 'none';
+                        document.getElementById('mcrOnAirTitle').innerText = _t('engine.stopped');
+                        document.getElementById('mcrOnAirCountdown').innerText = _t('engine.stopped');
+                    }
+                }
+                // 下一節目倒數
+                var pLabel = document.getElementById('progCountdownLabel');
+                var pTimer = document.getElementById('progCountdownTimer');
+                if (pLabel && pTimer) {
+                    if (nextUp) {
+                        var pdFr = timecodeToTotalFrames(nextUp.startTime) - cf;
+                        var pdS = Math.max(0, Math.ceil(pdFr / fr));
+                        pLabel.innerText = nextUp.name + ' [' + nextUp.startTime + ']';
+                        pTimer.innerText = String(Math.floor(pdS/60)).padStart(2,'0') + ':' + String(pdS%60).padStart(2,'0');
+                    } else {
+                        pLabel.innerText = '—';
+                        pTimer.innerText = '--:--';
+                    }
+                }
+                // Cue 倒數
+                var cLabel = document.getElementById('cueCountdownLabel');
+                var cTimer = document.getElementById('cueCountdownTimer');
+                var cMeta = document.getElementById('cueCountdownMeta');
+                var cBar = document.getElementById('cueProgressBarFill');
+                var cWrap = document.getElementById('cueProgressBarWrap');
+                if (cLabel && cTimer) {
+                    var triggers = globalTriggers || [];
+                    var nextCue = null;
+                    for (var i = 0; i < triggers.length; i++) {
+                        if (!triggers[i].triggered && triggers[i].targetFrames > cf) {
+                            nextCue = triggers[i];
+                            break;
+                        }
+                    }
+                    if (nextCue) {
+                        var diffFr = nextCue.targetFrames - cf;
+                        var diffS = Math.max(0, Math.ceil(diffFr / fr));
+                        cLabel.innerText = h(nextCue.progName) + ' — ' + h(nextCue.cueName);
+                        cTimer.innerText = String(Math.floor(diffS/60)).padStart(2,'0') + ':' + String(diffS%60).padStart(2,'0');
+                        if (cMeta) cMeta.innerText = '目標: ' + nextCue.timecodeStr + ' | ' + diffS + 's';
+                        if (cBar && cWrap) {
+                            var totalRef = 1800;
+                            if (onAir) totalRef = Math.ceil(timecodeToTotalFrames(onAir.duration) / fr);
+                            var pct = Math.max(0, Math.min(100, ((totalRef - diffS) / totalRef) * 100));
+                            cBar.style.width = pct + '%';
+                            cBar.style.background = diffS <= 30 ? '#ef4444' : '#f59e0b';
+                            cWrap.style.display = 'block';
+                        }
+                    } else {
+                        cLabel.innerText = '—';
+                        cTimer.innerText = '--:--';
+                        if (cMeta) cMeta.innerText = _t('engine.stopped');
+                        if (cWrap) cWrap.style.display = 'none';
+                    }
+                }
+            } catch(e) { /* 跨頁面 countdown 更新錯誤，靜默忽略 */ }
+        }
+
+        function masterTick() {
+            refreshClockOnly();
+            updateStatusBarLine();
+            if (!isTrackingActive) return;
+            // 跨頁面：更新倒數與 ON AIR 卡片
+            updateCountdownsOnly();
+            // 僅 Live 頁面：完整儀表板（含矩陣）
             const livePage = document.getElementById('page-live');
             if (livePage && livePage.classList.contains('active')) {
                 updateGlobalDashboard();
@@ -2116,9 +2369,13 @@ setTimeout(function() {
         }
         _masterTimer = setInterval(masterTick, 40);
 
-        // 自適應矩陣高度
+        // 自適應矩陣高度（節流）
         adjustMatrixHeight();
-        window.addEventListener('resize', adjustMatrixHeight);
+        var _resizeTimer = null;
+        window.addEventListener('resize', function() {
+            if (_resizeTimer) clearTimeout(_resizeTimer);
+            _resizeTimer = setTimeout(adjustMatrixHeight, 100);
+        });
 
         // 自動啟動主控監測（延遲確保 master timer 已啟用、資料已載入）
         setTimeout(function() {
@@ -2126,7 +2383,31 @@ setTimeout(function() {
                 initGlobalTracking();
             }
         }, 200);
+
+        // 頁面卸載時清理 timer，防止 memory leak
+        window.addEventListener('beforeunload', function() {
+            if (_masterTimer) { clearInterval(_masterTimer); _masterTimer = null; }
+            if (NTPManager.timerId) { clearInterval(NTPManager.timerId); NTPManager.timerId = null; }
+            if (_resizeTimer) clearTimeout(_resizeTimer);
+        });
     };
+
+    // ===== 全域 Toast 通知 =====
+    function showToast(msg, type) {
+        type = type || 'info';
+        var existing = document.querySelector('.county-toast');
+        if (existing) existing.remove();
+        var t = document.createElement('div');
+        t.className = 'county-toast county-toast-' + type;
+        t.textContent = msg;
+        t.onclick = function() { t.remove(); };
+        document.body.appendChild(t);
+        clearTimeout(t._timer);
+        t._timer = setTimeout(function() {
+            t.style.transition = 'opacity 0.3s'; t.style.opacity = '0';
+            setTimeout(function() { if (t.parentNode) t.remove(); }, 350);
+        }, 3500);
+    }
 
     // =============================================
     // 提示音 Preset 定義（含長短響、重複次數）
@@ -2300,31 +2581,113 @@ setTimeout(function() {
         } catch(e) { writeLog('🔇 Preview: ' + e.message, 'error'); }
     }
 
-    function renderPresetNodes(nodes) {
+    // ===== Item Checklist（ENGINE LIVE 時跳過段落） =====
+    var _skippedItems = {};  // { presetId: { itemName: true } }
+    function toggleSkipItem(presetId, itemName) {
+        if (!_skippedItems[presetId]) _skippedItems[presetId] = {};
+        if (_skippedItems[presetId][itemName]) {
+            delete _skippedItems[presetId][itemName];
+        } else {
+            _skippedItems[presetId][itemName] = true;
+        }
+        scheduleMatrixRecalc();
+        showToast(_skippedItems[presetId][itemName] ? '⏭️ 已跳過: ' + itemName : '✅ 已取消跳過: ' + itemName, 'info');
+    }
+    function isItemSkipped(presetId, itemName) {
+        return _skippedItems[presetId] && _skippedItems[presetId][itemName];
+    }
+
+    // ===== Item 管理 =====
+    function addItemRow(itemData) {
+        const tbody = document.getElementById('presetNodesTbody');
+        var tr = document.createElement('tr');
+        tr.className = 'item-header-row';
+        tr.style.cssText = 'background:#0f172a;border-top:2px solid #38bdf8;';
+        tr.setAttribute('data-item-idx', tbody.children.length);
+        var td = document.createElement('td');
+        td.colSpan = 6;
+        td.style.cssText = 'padding:6px 8px;';
+        var itemName = itemData ? itemData.name : '新段落';
+        var pid = document.getElementById('presetSelector').value;
+        var isSkipped = isItemSkipped(pid, itemName);
+        td.innerHTML = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' +
+            (isTrackingActive ? '<span class="item-chk" onclick="var inp=this.querySelector(\'input\');inp.checked=!inp.checked;var h=this.parentElement.parentElement.parentElement;var n=h.querySelector(\'.item-name-input\');if(n)try{toggleSkipItem(\'' + h(pid) + '\',n.value)}catch(e){}" style="cursor:pointer;font-size:14px;color:' + (isSkipped ? '#64748b' : '#22c55e') + ';">' + (isSkipped ? '☐' : '☑') + '</span>' : '') +
+            '<span style="color:#38bdf8;cursor:pointer;font-size:12px;" onclick="var n=this.parentElement.parentElement.parentElement.nextElementSibling;while(n&&!n.classList.contains(\'item-header-row\')){n.style.display=n.style.display===\'none\'?\'\':\'none\';n=n.nextElementSibling}">▾</span>' +
+            '<span style="color:#38bdf8;font-weight:bold;font-size:12px;">📦:</span>' +
+            '<input class="item-name-input" value="' + h(itemName) + '" style="width:120px;background:#090d16;border:1px solid #475569;color:#fff;padding:3px 6px;border-radius:3px;font-size:12px;" placeholder="段落名稱">' +
+            '<span style="color:#64748b;font-size:11px;">⏱</span>' +
+            '<input class="item-dur-input" value="' + (itemData ? secToMmss(itemData.duration) : '5:00') + '" style="width:55px;background:#090d16;border:1px solid #475569;color:#fff;padding:3px 6px;border-radius:3px;font-size:12px;font-family:monospace;" placeholder="MM:SS">' +
+            '<button class="btnNodeRemove" onclick="removeItemRow(this)" style="margin-left:4px;" title="刪除 Item">✕</button>' +
+            '</div>';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        // 如果有 item nodes，一併加入
+        if (itemData && itemData.nodes) {
+            itemData.nodes.forEach(function(n) {
+                var offset = n.offset;
+                var offsetType = '開始前', offsetSec = 10;
+                if (typeof offset === 'number') {
+                    if (offset < 0) { offsetType = '開始前'; offsetSec = Math.abs(offset); }
+                    else { offsetType = '開始後'; offsetSec = offset; }
+                } else if (typeof offset === 'string') {
+                    var eNum = parseInt(offset.replace('e','').replace('-','')) || 0;
+                    if (offset.startsWith('e-')) { offsetType = '結束前'; offsetSec = Math.abs(eNum); }
+                    else if (offset === 'e0') { offsetType = '結束時'; offsetSec = 0; }
+                    else { offsetType = '開始前'; offsetSec = Math.abs(eNum); }
+                }
+                addNodeRow({
+                    offsetType: offsetType, offsetSec: offsetSec,
+                    nodeName: n.name || '', soundId: n.soundId || 'tone'
+                });
+            });
+        }
+    }
+    function removeItemRow(btn) {
+        var row = btn.closest ? btn.closest('tr') : btn.parentNode.parentNode.parentNode;
+        if (!row || !row.parentNode) return;
+        var tbody = row.parentNode;
+        var sibling = row.nextElementSibling;
+        var toRemove = [row];
+        while (sibling && !sibling.classList.contains('item-header-row')) {
+            toRemove.push(sibling);
+            sibling = sibling.nextElementSibling;
+        }
+        toRemove.forEach(function(r) { if (r && r.parentNode) r.parentNode.removeChild(r); });
+    }
+
+    function renderPresetNodes(nodes, items) {
         const tbody = document.getElementById('presetNodesTbody');
         tbody.innerHTML = '';
-        // Reset sort icons
         presetSortState.field = null; presetSortState.asc = true;
         document.querySelectorAll('#presetNodesTable .sort-icon').forEach(function(el) {
             el.textContent = ''; el.classList.remove('active');
         });
+        // 先渲染 Items（如果有）
+        if (items && items.length > 0) {
+            items.forEach(function(item) {
+                addItemRow(item);
+            });
+            // 加入分隔線
+            var sep = document.createElement('tr');
+            sep.innerHTML = '<td colspan="6" style="padding:0;"><div style="border-top:1px dashed #374151;margin:6px 0;"></div><div style="font-size:10px;color:#64748b;padding:2px 8px;">📋 節目層級 Cue</div></td>';
+            tbody.appendChild(sep);
+        }
+        // 再渲染節目層級節點
         if (!nodes || nodes.length === 0) { addNodeRow(); return; }
-        // 按觸發時序排列（估算參考時長 30 分鐘）
         var sortedNodes = nodes.slice().sort(function(a, b) {
             function estAbsSec(n) {
                 var os = n.offset;
-                if (typeof os === 'number') return os < 0 ? os : os; // 開始前/後
+                if (typeof os === 'number') return os < 0 ? os : os;
                 var eNum = parseInt(String(os).replace('e', '').replace('-', '')) || 0;
-                if (String(os).startsWith('e-')) return 1800 - eNum; // 結束前
-                if (os === 'e0') return 1800;                         // 結束時
-                return 1800 + eNum;                                   // 結束後(未使用)
+                if (String(os).startsWith('e-')) return 1800 - eNum;
+                if (os === 'e0') return 1800;
+                return 1800 + eNum;
             }
             return estAbsSec(a) - estAbsSec(b);
         });
         sortedNodes.forEach(function(n) {
             let offset = n.offset;
-            let offsetType = '開始前';
-            let offsetSec = 10;
+            let offsetType = '開始前', offsetSec = 10;
             if (typeof offset === 'number') {
                 if (offset < 0) { offsetType = '開始前'; offsetSec = Math.abs(offset); }
                 else { offsetType = '開始後'; offsetSec = offset; }
@@ -2342,13 +2705,25 @@ setTimeout(function() {
                 if (diff < bestDiff) { bestDiff = diff; soundId = soundPresets[i].id; }
             }
             addNodeRow({
-                offsetType: offsetType,
-                offsetSec: offsetSec,
-                nodeName: n.name || '',
-                soundId: soundId
+                offsetType: offsetType, offsetSec: offsetSec,
+                nodeName: n.name || '', soundId: soundId
             });
         });
+        // 加入「新增 Item」按鈕
+        var addItemRow2 = document.createElement('tr');
+        addItemRow2.innerHTML = '<td colspan="6" style="padding:4px 8px;"><button class="btn-sync" onclick="addItemRow()" style="font-size:11px;padding:3px 10px;">＋ 新增段落 Item</button></td>';
+        tbody.appendChild(addItemRow2);
     }
+
+    // 更新 onPresetSelectionChange 以傳遞 items
+    var origOnPresetSelectionChange = onPresetSelectionChange || function(){};
+    onPresetSelectionChange = function() {
+        let id = document.getElementById('presetSelector').value;
+        if (!id || !cuePresets[id]) return;
+        document.getElementById('presetNameField').value = cuePresets[id].name;
+        renderPresetNodes(cuePresets[id].nodes || [], cuePresets[id].items || []);
+        refreshPresetJsonArea();
+    };
 
     // 節點排序狀態
     const presetSortState = { field: null, asc: true };
@@ -2458,9 +2833,11 @@ setTimeout(function() {
         const selId = document.getElementById('presetSelector').value;
         let name = document.getElementById('presetNameField').value.trim();
         if (!name) return;
-        const rows = document.querySelectorAll('#presetNodesTbody tr');
+        // 收集節目層級節點
+        const rows = document.querySelectorAll('#presetNodesTbody .preset-node-row');
         const parsedNodes = [];
         rows.forEach(function(row) {
+            if (row.classList.contains('item-header-row')) return;
             let offsetType = row.querySelector('.offsetType').value;
             const offsetSec = mmssToSec(row.querySelector('.offsetSec').value);
             const nodeName = row.querySelector('.nodeName').value.trim();
@@ -2477,14 +2854,45 @@ setTimeout(function() {
             else if (offsetType === '結束時') finalOffset = 'e0';
             parsedNodes.push({ offset: finalOffset, name: nodeName, freq: freq, soundId: soundId });
         });
+        // 收集 Items
+        var parsedItems = [];
+        var itemHeaders = document.querySelectorAll('#presetNodesTbody .item-header-row');
+        itemHeaders.forEach(function(headerRow) {
+            var itemName = headerRow.querySelector('.item-name-input').value.trim();
+            var itemDur = mmssToSec(headerRow.querySelector('.item-dur-input').value);
+            if (!itemName || itemDur <= 0) return;
+            var itemNodes = [];
+            var sibling = headerRow.nextElementSibling;
+            while (sibling && !sibling.classList.contains('item-header-row')) {
+                if (sibling.classList.contains('preset-node-row')) {
+                    var ot = sibling.querySelector('.offsetType').value;
+                    var os = mmssToSec(sibling.querySelector('.offsetSec').value);
+                    var nn = sibling.querySelector('.nodeName').value.trim();
+                    var si = sibling.querySelector('.soundSelect').value;
+                    if (!nn) { sibling = sibling.nextElementSibling; continue; }
+                    var fr = 1000;
+                    for (var fi = 0; fi < soundPresets.length; fi++) {
+                        if (soundPresets[fi].id === si) { fr = soundPresets[fi].freq; break; }
+                    }
+                    var fo;
+                    if (ot === '開始前') fo = -os;
+                    else if (ot === '開始後') fo = os;
+                    else if (ot === '結束前') fo = 'e-' + os;
+                    else if (ot === '結束時') fo = 'e0';
+                    itemNodes.push({ offset: fo, name: nn, freq: fr, soundId: si });
+                }
+                sibling = sibling.nextElementSibling;
+            }
+            parsedItems.push({ name: itemName, duration: itemDur, nodes: itemNodes });
+        });
         const targetId = selId ? selId : "preset_" + Date.now();
-        cuePresets[targetId] = { name: name, nodes: parsedNodes };
+        cuePresets[targetId] = { name: name, nodes: parsedNodes, items: parsedItems.length > 0 ? parsedItems : undefined };
         localStorage.setItem('county_presets_v8', JSON.stringify(cuePresets));
-        // Also sync to server (non-blocking, fire-and-forget)
         API.savePreset({ id: targetId, name: name, nodes: parsedNodes });
         refreshPresetDropdownUI();
         document.getElementById('presetSelector').value = targetId;
         refreshPresetJsonArea();
+        showToast("✅ Preset 已儲存: " + name, "success");
         markDirty();
         scheduleMatrixRecalc();
     }
@@ -2497,13 +2905,16 @@ setTimeout(function() {
             { offset: -180, name: "⏳ 開始前3分", freq: 800, soundId: "short_beep" },
             { offset: -60, name: "⏳ 開始前1分", freq: 900, soundId: "tone" },
             { offset: -30, name: "🔔 開始前30秒", freq: 1000, soundId: "double_beep" },
-            { offset: -15, name: "🔔 開始前15秒倒數", freq: 1200, soundId: "triple_beep" },
             { offset: 0, name: "▶ 開播", freq: 2000, soundId: "alert" },
             { offset: "e-180", name: "⏳ 結束前3分", freq: 800, soundId: "short_beep" },
-            { offset: "e-60", name: "⏳ 結束前1分", freq: 900, soundId: "tone" },
-            { offset: "e-30", name: "🔔 結束前30秒", freq: 1000, soundId: "double_beep" },
-            { offset: "e-15", name: "🔔 結束前15秒倒數", freq: 1200, soundId: "triple_beep" },
             { offset: "e0", name: "■ 播放結束", freq: 500, soundId: "bell" }
+        ], [
+            { name: "🎬 第一段", duration: 300, nodes: [
+                { offset: -15, name: "🔔 前15秒", freq: 1000, soundId: "double_beep" }
+            ]},
+            { name: "📺 第二段", duration: 300, nodes: [
+                { offset: -30, name: "🔔 前30秒", freq: 800, soundId: "short_beep" }
+            ]}
         ]);
         document.getElementById('presetJsonArea').value = '';
     }
@@ -2758,22 +3169,28 @@ setTimeout(function() {
         try {
             const data = JSON.parse(area.value.trim());
             if (!data.name || !Array.isArray(data.nodes)) { alert("JSON 必須包含 name 與 nodes 陣列"); return; }
-            // Validate nodes
             for (let i = 0; i < data.nodes.length; i++) {
                 let n = data.nodes[i];
                 if (n.offset === undefined || !n.name) { alert("節點 " + (i+1) + " 缺少 offset 或 name"); return; }
             }
-            // Generate ID if new, or use current
+            if (data.items) {
+                if (!Array.isArray(data.items)) { alert("items 必須是陣列"); return; }
+                for (let i = 0; i < data.items.length; i++) {
+                    var item = data.items[i];
+                    if (!item.name || !item.duration) { alert("Item " + (i+1) + " 缺少 name 或 duration"); return; }
+                }
+            }
             const selId = document.getElementById('presetSelector').value;
             const targetId = selId && cuePresets[selId] ? selId : "preset_" + Date.now();
-            cuePresets[targetId] = { name: data.name, nodes: data.nodes };
+            cuePresets[targetId] = { name: data.name, nodes: data.nodes, items: data.items || undefined };
             localStorage.setItem('county_presets_v8', JSON.stringify(cuePresets));
-            API.savePreset({ id: targetId, name: data.name, nodes: data.nodes });  // sync to server
+            API.savePreset({ id: targetId, name: data.name, nodes: data.nodes });
             refreshPresetDropdownUI();
             document.getElementById('presetSelector').value = targetId;
             onPresetSelectionChange();
             markDirty();
             scheduleMatrixRecalc();
+            showToast("✅ Preset JSON 已套用: " + data.name, "success");
             writeLog("✅ Preset JSON 已套用: " + data.name, 'success');
         } catch(err) { alert("JSON 語法錯誤: " + err.message); }
     }
@@ -2915,6 +3332,11 @@ setTimeout(function() {
             btn.disabled = false;
             btn.innerText = '🔄 立即同步';
             updateSettingsNtpUI();
+            if (NTPManager.status === 'connected') {
+                showToast("🕒 NTP 同步成功，偏移: " + Math.round(NTPManager.offset) + "ms", "success");
+            } else {
+                showToast("⚠️ NTP 同步失敗: " + NTPManager.errorMsg, "error");
+            }
         });
     }
 
@@ -2958,13 +3380,20 @@ setTimeout(function() {
     }
 
     // ===== 自適應矩陣高度（填滿視窗剩餘空間） =====
+    var _matrixCollapsed = false;
+    function toggleMatrixCollapse() {
+        _matrixCollapsed = !_matrixCollapsed;
+        var body = document.getElementById('matrixCollapseBody');
+        var toggle = document.getElementById('matrixCollapseToggle');
+        if (body) body.style.display = _matrixCollapsed ? 'none' : '';
+        if (toggle) toggle.innerText = _matrixCollapsed ? '▸ 展開' : '▾ 收合';
+    }
     function adjustMatrixHeight() {
         const wrap = document.getElementById('matrixScrollWrap');
         if (!wrap) return;
         const rect = wrap.getBoundingClientRect();
         const viewH = window.innerHeight;
         const topOffset = rect.top;
-        // 預留底部 padding + 終端 console（約 160px）
         const newH = Math.max(120, viewH - topOffset - 160);
         wrap.style.height = newH + 'px';
     }
@@ -3115,6 +3544,7 @@ setTimeout(function() {
             calculateMCRTrafficSummary();
             renderRundownUI();
             scheduleMatrixRecalc();
+            showToast("⚡ 已快速修改: " + target.name, "success");
             writeLog('已快速修改節目 [' + target.name + '] 的開始時間與長度，CUE 已重新計算', 'warn');
         }
         cancelQuickEdit();
@@ -3123,6 +3553,85 @@ setTimeout(function() {
         quickEditTargetId = null;
         const panel = document.getElementById('mcrQuickEdit');
         if (panel) panel.style.display = 'none';
+    }
+
+    // ===== 一鍵時間偏移（保留 Quick Edit） =====
+    var _shiftUndoStack = null;
+    function shiftProgram(targetId, offsetSec) {
+        if (!isTrackingActive) { showToast("請先啟動 ENGINE", "warn"); return; }
+        const targetDateStr = document.getElementById('globalTargetDate').value;
+        const activeList = getExpandedRundownForDate(targetDateStr);
+        if (activeList.length === 0) return;
+        // 如果沒有指定 ID，找當前播出或下一個節目
+        if (!targetId) {
+            const currentTotalFrames = timecodeToTotalFrames(dateToTimecode(getCalibratedDate()));
+            var found = null;
+            activeList.forEach(function(p) {
+                var sf = timecodeToTotalFrames(p.startTime);
+                var ef = sf + timecodeToTotalFrames(p.duration);
+                if (currentTotalFrames >= sf && currentTotalFrames <= ef) found = p;
+            });
+            if (!found) {
+                var nearestDiff = Infinity;
+                activeList.forEach(function(p) {
+                    var sf = timecodeToTotalFrames(p.startTime);
+                    var diff = sf - currentTotalFrames;
+                    if (diff > 0 && diff < nearestDiff) { nearestDiff = diff; found = p; }
+                });
+            }
+            if (!found) { showToast("無播出中或即將進行的節目", "warn"); return; }
+            targetId = found.id;
+        }
+        // 找出該節目與當日所有後續節目
+        var targetProg = masterScheduleDB.find(function(p) { return p.id === targetId; });
+        if (!targetProg) return;
+        var targetStartFr = timecodeToTotalFrames(targetProg.startTime);
+        var shiftTargets = [];
+        masterScheduleDB.forEach(function(p) {
+            if (p.broadcastDate === targetProg.broadcastDate && timecodeToTotalFrames(p.startTime) >= targetStartFr) {
+                shiftTargets.push(p);
+            }
+        });
+        // 儲存 undo 資訊
+        _shiftUndoStack = {
+            targets: shiftTargets.map(function(p) { return { id: p.id, oldStart: p.startTime, oldDur: p.duration }; }),
+            offsetSec: offsetSec
+        };
+        // 執行偏移
+        shiftTargets.forEach(function(p) {
+            var newFr = Math.max(0, timecodeToTotalFrames(p.startTime) + offsetSec * frameRate);
+            p.startTime = totalFramesToTimecode(newFr);
+            p._updatedAt = Date.now();
+        });
+        saveToLocalStorage();
+        calculateMCRTrafficSummary();
+        renderRundownUI();
+        scheduleMatrixRecalc();
+        showToast("⏱ 已偏移 " + (offsetSec >= 0 ? '+' : '') + offsetSec + "s (" + shiftTargets.length + " 個節目)", "success");
+        writeLog("⏱ 一鍵偏移 " + (offsetSec >= 0 ? '+' : '') + offsetSec + "s，影響 " + shiftTargets.length + " 個節目", "warn");
+        // 顯示 Undo 按鈕（5 秒後自動隱藏）
+        var undoBtn = document.getElementById('shiftUndoBtn');
+        if (undoBtn) {
+            undoBtn.style.display = 'inline';
+            clearTimeout(undoBtn._timer);
+            undoBtn._timer = setTimeout(function() { undoBtn.style.display = 'none'; }, 5000);
+        }
+    }
+    function undoShiftProgram() {
+        if (!_shiftUndoStack) return;
+        _shiftUndoStack.targets.forEach(function(t) {
+            var p = masterScheduleDB.find(function(x) { return x.id === t.id; });
+            if (p) { p.startTime = t.oldStart; p._updatedAt = Date.now(); }
+        });
+        saveToLocalStorage();
+        calculateMCRTrafficSummary();
+        renderRundownUI();
+        scheduleMatrixRecalc();
+        showToast("↩️ 已還原偏移", "info");
+        writeLog("↩️ 已還原偏移 " + _shiftUndoStack.offsetSec + "s", "warn");
+        _shiftUndoStack = null;
+        var undoBtn = document.getElementById('shiftUndoBtn');
+        if (undoBtn) { undoBtn.style.display = 'none'; clearTimeout(undoBtn._timer); }
     }
 
     // ===== Tag & Color Label 管理 =====
@@ -3191,9 +3700,9 @@ setTimeout(function() {
         const pid = document.getElementById('progPreset').value;
         let periodicDays = (pType === 'custom') ? getPeriodicDays() : [];
 
-        if (!name || !bDate || !startStr || !durStr) { alert("請完整填寫製播欄位！"); return; }
-        if (pType !== 'none' && pEndDate < bDate) { alert("重複終止日期不得早於起播生效日期！"); return; }
-        if (pType === 'custom' && periodicDays.length === 0) { alert("請至少選擇一天！"); return; }
+        if (!name || !bDate || !startStr || !durStr) { showToast("請完整填寫製播欄位！", "error"); return; }
+        if (pType !== 'none' && pEndDate < bDate) { showToast("終止日期不得早於起播日期！", "error"); return; }
+        if (pType === 'custom' && periodicDays.length === 0) { showToast("請至少選擇一天！", "error"); return; }
 
         // 時間衝突檢測：檢查此節目在該日期是否與其他節目重疊
         var conflictCheckDate = bDate;
@@ -3225,6 +3734,7 @@ setTimeout(function() {
                         presetId: pid, tags: tags, colorLabel: colorLabel, periodicDays: [],
                         _updatedAt: Date.now()
                     });
+                    showToast("🔀 已建立單次覆蓋節目", "success");
                     writeLog("🔀 已建立單次覆蓋節目（原始週期未變更）。");
                 } else {
                     target.name = name; target.broadcastDate = bDate; target.startTime = startStr;
@@ -3232,6 +3742,7 @@ setTimeout(function() {
                     target.presetId = pid; target.tags = tags; target.colorLabel = colorLabel;
                     target.periodicDays = periodicDays;
                     target._updatedAt = Date.now();
+                    showToast("✅ 節目已更新", "success");
                     writeLog("已更新排程資源條目。");
                 }
             }
@@ -3246,6 +3757,7 @@ setTimeout(function() {
             };
             API.saveSchedule(newProg).catch(function() {});
             masterScheduleDB.push(newProg);
+            showToast("✅ 節目已新增: " + name, "success");
             writeLog("新增跨期編排節目 [" + name + "] 成功。");
         }
         saveToLocalStorage();
@@ -3352,32 +3864,98 @@ setTimeout(function() {
 
     function deleteProgram(id) {
         if (currentEditingId === id) exitEditMode();
+        if (isTrackingActive && !confirm("🔒 ENGINE 運行中！刪除節目可能影響播出，確定刪除？")) return;
         if (!confirm("確定刪除此節目？")) return;
+        showToast("🗑 正在刪除節目...", "info");
         API.deleteSchedule(id).catch(function() {});
         masterScheduleDB = masterScheduleDB.filter(function(p) { return p.id !== id; });
         saveToLocalStorage();
         renderGUICalendar(); calculateMCRTrafficSummary(); renderRundownUI();
         scheduleMatrixRecalc();
+        showToast("✅ 節目已刪除", "success");
     }
 
-    function clearAllPrograms() {
-        if (confirm("確定全清 County 編排庫？所有常規設定將消失。")) {
-            if (currentEditingId !== null) exitEditMode();
-            masterScheduleDB.forEach(function(p) {
-                API.deleteSchedule(p.id).catch(function() {
-                    _pendingDeletes.add(p.id);
-                });
-            });
-            masterScheduleDB = []; saveToLocalStorage(); renderGUICalendar(); calculateMCRTrafficSummary(); renderRundownUI();
-            scheduleMatrixRecalc();
+    function maintenanceClearDay() {
+        if (isTrackingActive) { showToast("🔒 ENGINE 運行中，禁止清除", "error"); return; }
+        var targetDate = document.getElementById('globalTargetDate').value;
+        var toRemove = getExpandedRundownForDate(targetDate);
+        if (toRemove.length === 0) { showToast("此日期無任何節目", "info"); return; }
+        // 第一次確認
+        var oneTimeCount = 0, periodicCount = 0;
+        toRemove.forEach(function(p) {
+            if (p.periodicType === 'none') oneTimeCount++;
+            else periodicCount++;
+        });
+        var msg = "確定清除「" + targetDate + "」所有節目？\n";
+        msg += "單次 " + oneTimeCount + " 筆（將刪除）\n";
+        if (periodicCount > 0) msg += "週期 " + periodicCount + " 筆（將加入例外跳過）";
+        if (!confirm(msg)) return;
+        // 第二次確認（輸入 verify）
+        var verify = prompt('請輸入 CLEAR 確認（大寫）：');
+        if (verify !== 'CLEAR') { showToast("❌ 確認失敗，已取消", "error"); return; }
+        if (currentEditingId !== null) exitEditMode();
+        showToast("🗑 正在清除當日排程...", "warn");
+        toRemove.forEach(function(p) {
+            if (p.periodicType === 'none') {
+                API.deleteSchedule(p.id).catch(function() { _pendingDeletes.add(p.id); });
+                masterScheduleDB = masterScheduleDB.filter(function(x) { return x.id !== p.id; });
+            } else {
+                var prog = masterScheduleDB.find(function(x) { return x.id === p.id; });
+                if (prog) {
+                    var exc = prog.exceptionDates || [];
+                    if (typeof exc === 'string') try { exc = JSON.parse(exc); } catch(e) { exc = []; }
+                    if (exc.indexOf(targetDate) < 0) {
+                        exc.push(targetDate);
+                        prog.exceptionDates = exc;
+                        prog._updatedAt = Date.now();
+                    }
+                }
+            }
+        });
+        saveToLocalStorage();
+        if (API.syncAllToServer) API.syncAllToServer();
+        renderGUICalendar();
+        calculateMCRTrafficSummary();
+        renderRundownUI();
+        scheduleMatrixRecalc();
+        showToast("✅ 已清除 " + targetDate + " 共 " + toRemove.length + " 筆節目", "success");
+    }
+    function maintenanceClearAll() {
+        if (isTrackingActive) { showToast("🔒 ENGINE 運行中，禁止清除", "error"); return; }
+        if (masterScheduleDB.length === 0) { showToast("資料庫已無任何節目", "info"); return; }
+        if (!confirm("🚨 確定清除「全部」排程？共 " + masterScheduleDB.length + " 筆節目將永久刪除。\n\n此操作不可還原！")) return;
+        var verify = prompt('請輸入 CLEAR ALL 確認（大寫）：');
+        if (verify !== 'CLEAR ALL') { showToast("❌ 確認失敗，已取消", "error"); return; }
+        if (currentEditingId !== null) exitEditMode();
+        showToast("🗑 正在清除全部排程...", "warn");
+        masterScheduleDB.forEach(function(p) {
+            API.deleteSchedule(p.id).catch(function() { _pendingDeletes.add(p.id); });
+        });
+        masterScheduleDB = [];
+        saveToLocalStorage();
+        renderGUICalendar();
+        calculateMCRTrafficSummary();
+        renderRundownUI();
+        scheduleMatrixRecalc();
+        showToast("✅ 已清除全部 " + masterScheduleDB.length + " 筆節目", "success");
+    }
+
+    function exportRundown(scope) {
+        var data, filename;
+        if (scope === 'day') {
+            var targetDate = document.getElementById('globalTargetDate').value;
+            data = getExpandedRundownForDate(targetDate);
+            filename = "County_Schedule_" + targetDate + ".json";
+            if (data.length === 0) { showToast("此日期無任何節目可供匯出", "info"); return; }
+        } else {
+            data = masterScheduleDB;
+            filename = "County_Schedule_All.json";
         }
-    }
-
-    function exportRundown() {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(masterScheduleDB, null, 2));
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
         const dl = document.createElement('a'); dl.setAttribute("href", dataStr);
-        dl.setAttribute("download", "VCC_PRE_Visual_MasterSchedule.json");
+        dl.setAttribute("download", filename);
         document.body.appendChild(dl); dl.click(); dl.remove();
+        showToast("✅ 已匯出 " + data.length + " 筆節目", "success");
     }
 
     function importRundown(input) {
@@ -3387,12 +3965,51 @@ setTimeout(function() {
             try {
                 const imported = JSON.parse(e.target.result);
                 if (Array.isArray(imported)) {
+                    if (imported.length === 0 || !imported[0].id) {
+                        showToast("⚠️ 無效的排程格式", "error"); return;
+                    }
                     masterScheduleDB = imported; saveToLocalStorage(); onGlobalDateChange();
-                    writeLog("外部多期交通數據集視覺化注入成功。");
+                    showToast("✅ 已匯入 " + imported.length + " 筆全部排程", "success");
+                    writeLog("外部排程數據匯入成功。");
                 }
             } catch(err) { alert("檔案解析失敗"); }
         };
         reader.readAsText(file); input.value = '';
+    }
+
+    function importRundownDay() {
+        var input = document.getElementById('importFile');
+        input.accept = '.json';
+        input.onchange = function(e) {
+            var file = input.files[0]; if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function(ev) {
+                try {
+                    var imported = JSON.parse(ev.target.result);
+                    if (!Array.isArray(imported)) { showToast("⚠️ 無效的排程格式", "error"); return; }
+                    var targetDate = document.getElementById('globalTargetDate').value;
+                    var added = 0;
+                    imported.forEach(function(p) {
+                        if (p.broadcastDate === targetDate || (p.broadcast_date === targetDate)) {
+                            var exists = masterScheduleDB.find(function(x) { return x.id === p.id; });
+                            if (!exists) {
+                                p.broadcastDate = p.broadcastDate || p.broadcast_date;
+                                p.startTime = p.startTime || p.start_time;
+                                p._updatedAt = Date.now();
+                                masterScheduleDB.push(p);
+                                added++;
+                            }
+                        }
+                    });
+                    if (added === 0) { showToast("⚠️ 檔案中無 " + targetDate + " 的節目", "warn"); return; }
+                    saveToLocalStorage(); onGlobalDateChange();
+                    showToast("✅ 已匯入 " + added + " 筆至 " + targetDate, "success");
+                } catch(err) { alert("檔案解析失敗"); }
+            };
+            reader.readAsText(file);
+            input.value = '';
+        };
+        input.click();
     }
 
     // Rundown 排序狀態
@@ -3493,28 +4110,55 @@ setTimeout(function() {
             else if (prog.id === nextUpId) highlightClass = "row-nextup";
 
             // Tags
-            let tagsHtml = '';
+            var tagsHtml = '';
             if (prog.tags && prog.tags.length > 0) {
                 prog.tags.forEach(function(tt) {
-                    tagsHtml += '<span class="tag-badge" style="background:#1f2937;color:#e2e8f0;">' + tt + '</span>';
+                    tagsHtml += '<span class="tag-badge" style="background:#1f2937;color:#e2e8f0;">' + h(tt) + '</span>';
                 });
             }
 
-            tbody.innerHTML += '<tr class="' + highlightClass + '" data-prog-id="' + prog.id + '">' +
-                '<td><span class="prog-color-dot" style="background:' + dotColor + ';"></span><b>' + prog.name + '</b> ' + tagsHtml + '</td>' +
-                '<td style="color:#9ca3af;">' + prog.broadcastDate + '</td>' +
-                '<td style="font-family:monospace; font-weight:bold;">' + prog.startTime + '</td>' +
-                '<td style="font-family:monospace;">' + computeEndTime(prog.startTime, prog.duration) + '</td>' +
-                '<td style="font-family:monospace;">' + prog.duration + '</td>' +
-                '<td><span class="status-badge ' + typeBadge + '">' + typeLabel + '</span></td>' +
-                '<td><span style="color:#38bdf8;">' + currentPresetName + '</span></td>' +
+            tbody.innerHTML += '<tr class="' + highlightClass + '" data-prog-id="' + h(prog.id) + '">' +
+                '<td><span class="prog-color-dot" style="background:' + dotColor + ';"></span><b>' + h(prog.name) + '</b> ' + tagsHtml + '</td>' +
+                '<td style="color:#9ca3af;">' + h(prog.broadcastDate) + '</td>' +
+                '<td style="font-family:monospace; font-weight:bold;">' + h(prog.startTime) + '</td>' +
+                '<td style="font-family:monospace;">' + h(computeEndTime(prog.startTime, prog.duration)) + '</td>' +
+                '<td style="font-family:monospace;">' + h(prog.duration) + '</td>' +
+                '<td><span class="status-badge ' + h(typeBadge) + '">' + h(typeLabel) + '</span></td>' +
+                '<td><span style="color:#38bdf8;">' + h(currentPresetName) + '</span></td>' +
                 '<td style="text-align: center; white-space:nowrap;">' +
-                    '<button class="btn-action btn-action-edit" onclick="enterEditMode(\'' + prog.id + '\')">✏️ 編輯</button>' +
-                    '<button class="btn-action btn-action-copy" onclick="duplicateProgram(\'' + prog.id + '\')">📋 複製</button>' +
-                    '<button class="btn-action btn-action-del" onclick="deleteProgram(\'' + prog.id + '\')">❌ 刪除</button>' +
+                    '<button class="btn-action btn-action-edit" onclick="enterEditMode(\'' + h(prog.id) + '\')">✏️ 編輯</button>' +
+                    '<button class="btn-action btn-action-copy" onclick="duplicateProgram(\'' + h(prog.id) + '\')">📋 複製</button>' +
+                    '<button class="btn-action btn-action-del" onclick="deleteProgram(\'' + h(prog.id) + '\')">❌ 刪除</button>' +
                 '</td>' +
                 '</tr>';
         });
+    }
+
+    // ===== Session Lock（播出鎖定） =====
+    function updateSessionLockUI() {
+        var locked = isTrackingActive;
+        // 排程頁：僅鎖定刪除/全清，保留新增/編輯（顯示警告）
+        document.querySelectorAll('#rundownTableBody .btn-action-del').forEach(function(btn) {
+            btn.disabled = locked;
+            btn.style.opacity = locked ? '0.4' : '1';
+            btn.title = locked ? '🔒 ENGINE 運行中，刪除已鎖定' : '';
+        });
+        document.querySelectorAll('#rundownTableBody .btn-action-copy, #rundownTableBody .btn-action-edit').forEach(function(btn) {
+            btn.title = locked ? '⚠️ ENGINE 運行中' : '';
+        });
+        // 全清按鈕
+        document.querySelectorAll('[onclick^="maintenanceClear"]').forEach(function(btn) {
+            btn.disabled = locked;
+            btn.style.opacity = locked ? '0.4' : '1';
+            btn.title = locked ? '🔒 ENGINE 運行中' : '';
+        });
+        // 側欄 ENGINE LIVE 指示
+        var warnEl = document.getElementById('liveEditWarn');
+        if (warnEl) warnEl.style.display = locked ? 'inline' : 'none';
+        var sideEng = document.getElementById('sidebarEngineStatus');
+        if (sideEng) {
+            sideEng.style.color = locked ? '#22c55e' : '#9ca3af';
+        }
     }
 
     function initGlobalTracking() {
@@ -3539,7 +4183,9 @@ setTimeout(function() {
             }
             const sideEng = document.getElementById('sidebarEngineStatus');
             if (sideEng) sideEng.innerText = '⏹️ 引擎待命';
+            showToast("⏹️ ENGINE 已停止", "warn");
             writeLog("⏹️ 主控監測 ENGINE 已停止", 'warn');
+            updateSessionLockUI();
             return;
         }
 
@@ -3564,7 +4210,9 @@ setTimeout(function() {
         }
         const sideEng = document.getElementById('sidebarEngineStatus');
         if (sideEng) sideEng.innerText = '🟢 ENGINE ON-AIR';
+        showToast("🚀 ENGINE 已啟動 — " + targetDateStr, "success");
         writeLog("County 觀測日 [" + targetDateStr + "] 矩陣引擎鎖定並作為主控首頁核心。", 'warn');
+        updateSessionLockUI();
 
         calculateGlobalTimelineMatrix(false);
         // _masterTimer already running — just toggles via isTrackingActive flag
@@ -3580,6 +4228,9 @@ setTimeout(function() {
         }, 100);
     }
     function calculateGlobalTimelineMatrix(isHotReload) {
+        // 清除 dashboard 矩陣行快取，防止 updateGlobalDashboard 讀到 detached DOM
+        window.__liveUI_matrixRowCache = null;
+        window.__liveUI_lastMatrixRender = 0;
         const targetDateStr = document.getElementById('globalTargetDate').value;
         const activeList = getExpandedRundownForDate(targetDateStr);
 
@@ -3634,10 +4285,11 @@ setTimeout(function() {
 
             prog.startTotalFrames = startFrames;
             prog.endTotalFrames = endFrames;
-            progDurations[prog.name] = { startFrames: startFrames, endFrames: endFrames, progName: prog.name };
+            progDurations[prog.name] = { startFrames: startFrames, endFrames: endFrames, progName: prog.name, progId: prog.id };
 
             const targetPreset = cuePresets[prog.presetId] ? cuePresets[prog.presetId] : cuePresets["pre_broadcast"];
 
+            // 處理節目層級節點
             targetPreset.nodes.forEach(function(node) {
                 let nodeTargetFrames = 0;
                 if (typeof node.offset === "string" && node.offset.startsWith('e')) {
@@ -3646,11 +4298,8 @@ setTimeout(function() {
                 } else {
                     nodeTargetFrames = startFrames + (node.offset * frameRate);
                 }
-
                 const fullNodeName = "【" + prog.name + "】" + node.name;
                 const wasTriggered = triggeredBackup[fullNodeName] ? true : false;
-
-                // 找對應的 soundPreset（若無 soundId 則以頻率最近匹配，確保舊資料相容）
                 let spMatch = null;
                 if (node.soundId) {
                     for (let si = 0; si < soundPresets.length; si++) {
@@ -3658,7 +4307,6 @@ setTimeout(function() {
                     }
                 }
                 if (!spMatch) {
-                    // 回溯相容：以頻率最近匹配
                     let bestDiff = Infinity, bestIdx = 0;
                     for (let si = 0; si < soundPresets.length; si++) {
                         const diff = Math.abs(soundPresets[si].freq - (node.freq || 1000));
@@ -3667,18 +4315,67 @@ setTimeout(function() {
                     spMatch = soundPresets[bestIdx];
                 }
                 globalTriggers.push({
-                    progId: prog.id,
-                    progName: prog.name,
-                    progTags: prog.tags || [],
-                    cueName: node.name,
-                    fullNodeName: fullNodeName,
-                    targetFrames: nodeTargetFrames,
-                    timecodeStr: totalFramesToTimecode(nodeTargetFrames),
-                    triggered: wasTriggered,
-                    freq: node.freq,
-                    soundPreset: spMatch || null
+                    progId: prog.id, progName: prog.name, progTags: prog.tags || [],
+                    cueName: node.name, fullNodeName: fullNodeName,
+                    targetFrames: nodeTargetFrames, timecodeStr: totalFramesToTimecode(nodeTargetFrames),
+                    triggered: wasTriggered, freq: node.freq, soundPreset: spMatch || null,
+                    itemName: ''  // 空白表示節目層級
                 });
             });
+            // 處理 Items（段落 Cue）
+            if (targetPreset.items && targetPreset.items.length > 0) {
+                var itemOffsetFr = 0;
+                targetPreset.items.forEach(function(item) {
+                    // 檢查是否被跳過
+                    if (isItemSkipped(prog.presetId, item.name)) {
+                        itemOffsetFr += item.duration * frameRate;
+                        return;
+                    }
+                    var itemStartFr = startFrames + itemOffsetFr;
+                    var itemEndFr = itemStartFr + (item.duration * frameRate);
+                    if (item.nodes && item.nodes.length > 0) {
+                        item.nodes.forEach(function(node) {
+                            var nodeTargetFr = 0;
+                            if (typeof node.offset === "string" && node.offset.startsWith('e')) {
+                                var offSec = parseInt(node.offset.replace("e", ""), 10);
+                                nodeTargetFr = itemEndFr + (offSec * frameRate);
+                            } else {
+                                nodeTargetFr = itemStartFr + (node.offset * frameRate);
+                            }
+                            var fullNN = "【" + prog.name + " — " + item.name + "】" + node.name;
+                            var wasTr = triggeredBackup[fullNN] ? true : false;
+                            var spM = null;
+                            if (node.soundId) {
+                                for (var si = 0; si < soundPresets.length; si++) {
+                                    if (soundPresets[si].id === node.soundId) { spM = soundPresets[si]; break; }
+                                }
+                            }
+                            if (!spM) {
+                                var bd = Infinity, bi = 0;
+                                for (var si = 0; si < soundPresets.length; si++) {
+                                    var df = Math.abs(soundPresets[si].freq - (node.freq || 1000));
+                                    if (df < bd) { bd = df; bi = si; }
+                                }
+                                spM = soundPresets[bi];
+                            }
+                            globalTriggers.push({
+                                progId: prog.id, progName: prog.name, progTags: prog.tags || [],
+                                cueName: node.name, fullNodeName: fullNN,
+                                targetFrames: nodeTargetFr, timecodeStr: totalFramesToTimecode(nodeTargetFr),
+                                triggered: wasTr, freq: node.freq, soundPreset: spM || null,
+                                itemName: item.name
+                            });
+                        });
+                    }
+                    // 註冊 item 區塊用於 timeline
+                    progDurations[prog.name + ' — ' + item.name] = {
+                        startFrames: itemStartFr, endFrames: itemEndFr,
+                        progName: prog.name + ' — ' + item.name, progId: prog.id,
+                        itemOf: prog.name
+                    };
+                    itemOffsetFr += item.duration * frameRate;
+                });
+            }
         });
 
         globalTriggers.sort(function(a, b) { return a.targetFrames - b.targetFrames; });
@@ -3704,7 +4401,7 @@ setTimeout(function() {
             let tagsHtml = '';
             if (firstT.progTags && firstT.progTags.length > 0) {
                 firstT.progTags.forEach(function(tt) {
-                    tagsHtml += '<span class="tag-badge" style="background:#1f2937;color:#e2e8f0;">' + tt + '</span> ';
+                    tagsHtml += '<span class="tag-badge" style="background:#1f2937;color:#e2e8f0;">' + h(tt) + '</span> ';
                 });
             }
             // Program header row (name + time range + tags span all Cue rows)
@@ -3712,17 +4409,30 @@ setTimeout(function() {
             matrixBody.innerHTML += '<tr class="matrix-row prog-color-' + cIdx + '" style="background:#0f172a;border-bottom:2px solid #1f2937;">' +
                 '<td colspan="6" style="padding:8px 10px;">' +
                 '<span class="prog-color-dot" style="background:' + MATRIX_COLORS[cIdx] + ';width:12px;height:12px;"></span> ' +
-                '<b style="font-size:14px;cursor:pointer;" onclick="matrixEditProgram(\'' + _progId + '\')" title="點擊編輯此節目">' + pn + '</b>' +
+                '<b style="font-size:14px;cursor:pointer;" onclick="matrixEditProgram(\'' + h(_progId) + '\')" title="點擊編輯此節目">' + h(pn) + '</b>' +
                 tagsHtml +
-                ' <span style="color:#64748b;font-size:11px;font-family:monospace;">[' + progStartTC + ' – ' + progEndTC + ']</span>' +
+                ' <span style="color:#64748b;font-size:11px;font-family:monospace;">[' + h(progStartTC) + ' – ' + h(progEndTC) + ']</span>' +
                 '</td></tr>';
             // Cue sub-rows with mx-row-{triggerIndex} for dashboard compatibility
+            var lastItemName = '';
             indices.forEach(function(ti) {
                 let t = globalTriggers[ti];
+                // 如果是 item cue，先顯示 item 標題列
+                var itemPrefix = '';
+                if (t.itemName && t.itemName !== lastItemName) {
+                    lastItemName = t.itemName;
+                    var itemPd = progDurations[pn + ' — ' + t.itemName];
+                    var itemStart = itemPd ? totalFramesToTimecode(itemPd.startFrames).substring(0,5) : '--:--';
+                    var itemEnd = itemPd ? totalFramesToTimecode(itemPd.endFrames).substring(0,5) : '--:--';
+                    matrixBody.innerHTML += '<tr class="matrix-row prog-color-' + cIdx + '" style="background:rgba(56,189,248,0.04);border-top:1px solid #1f2937;">' +
+                        '<td colspan="6" style="padding:4px 10px 4px 24px;font-size:12px;color:#38bdf8;">' +
+                        '📦 ' + h(t.itemName) + ' <span style="color:#64748b;font-size:10px;font-family:monospace;">[' + itemStart + ' – ' + itemEnd + ']</span></td></tr>';
+                }
+                var padLeft = t.itemName ? '24px' : '12px';
                 matrixBody.innerHTML += '<tr id="mx-row-' + ti + '" class="matrix-row prog-color-' + cIdx + '" style="border-top:none;">' +
                     '<td></td><td></td>' +
-                    '<td style="padding-left:12px;">' + t.cueName + '</td>' +
-                    '<td style="font-family:monospace;">' + t.timecodeStr + '</td>' +
+                    '<td style="padding-left:' + padLeft + ';">' + h(t.cueName) + '</td>' +
+                    '<td style="font-family:monospace;">' + h(t.timecodeStr) + '</td>' +
                     '<td id="mx-status-' + ti + '">等待</td></tr>';
             });
         });
@@ -3800,6 +4510,14 @@ setTimeout(function() {
                         const tt = document.getElementById('timelineTooltip');
                         if (tt) tt.style.display = 'none';
                     });
+                    block.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        var _pid = progDurations[pn] ? progDurations[pn].progId : null;
+                        if (_pid && typeof enterEditMode === 'function') {
+                            enterEditMode(_pid);
+                            if (typeof switchPage === 'function') switchPage('rundown');
+                        }
+                    });
                 }
 
                 // Cue tick 刻度（疊加在色塊上）
@@ -3815,6 +4533,39 @@ setTimeout(function() {
                 });
                 track.appendChild(bar);
                 trackContainer.appendChild(track);
+                // 加入 Item 子軌道
+                var itemKeys = Object.keys(progDurations).filter(function(k) {
+                    return progDurations[k].itemOf === pn;
+                });
+                itemKeys.sort(function(a, b) {
+                    return progDurations[a].startFrames - progDurations[b].startFrames;
+                });
+                itemKeys.forEach(function(ik) {
+                    var ipd = progDurations[ik];
+                    if (!ipd || ipd.startFrames >= ipd.endFrames) return;
+                    var iTrack = document.createElement('div');
+                    iTrack.className = 'timeline-track';
+                    iTrack.style.cssText = 'opacity:0.7;';
+                    var iLabel = document.createElement('div');
+                    iLabel.className = 'timeline-track-label';
+                    iLabel.style.cssText = 'font-size:9px;padding-left:16px;';
+                    iLabel.innerHTML = '<span style="color:#38bdf8;">▸</span> ' + ik.replace(pn + ' — ', '');
+                    iTrack.appendChild(iLabel);
+                    var iBar = document.createElement('div');
+                    iBar.className = 'timeline-track-bar';
+                    var ibStart = Math.max(0, ((ipd.startFrames - timelineRange.minFrames) / rangeSpan) * 100);
+                    var ibEnd = Math.min(100, ((ipd.endFrames - timelineRange.minFrames) / rangeSpan) * 100);
+                    var iBlock = document.createElement('div');
+                    iBlock.className = 'timeline-prog-block';
+                    iBlock.style.left = ibStart + '%';
+                    iBlock.style.width = Math.max(0.3, ibEnd - ibStart) + '%';
+                    iBlock.style.backgroundColor = MATRIX_COLORS[cIdx];
+                    iBlock.style.opacity = '0.35';
+                    iBlock.title = ik;
+                    iBar.appendChild(iBlock);
+                    iTrack.appendChild(iBar);
+                    trackContainer.appendChild(iTrack);
+                });
             });
         } else {
             if (trackContainer) trackContainer.innerHTML = '';
@@ -3896,8 +4647,8 @@ setTimeout(function() {
                 } else {
                     mcrCard.classList.add('no-active');
                     mcrLiveTag.style.display = 'none';
-                    document.getElementById('mcrOnAirTitle').innerText = "無常規節目播出 (IDLE)";
-                    document.getElementById('mcrOnAirCountdown').innerText = "系統靜態待命";
+                    document.getElementById('mcrOnAirTitle').innerText = _t('engine.stopped');
+                    document.getElementById('mcrOnAirCountdown').innerText = _t('engine.stopped');
                 }
             }
 
@@ -3951,12 +4702,12 @@ setTimeout(function() {
                 }
                 if (activeCueIdx >= 0) {
                     const ac = globalTriggers[activeCueIdx];
-                    currentCueEl.innerHTML = '🚨 ' + ac.progName + ' — <span style="color:#9ca3af;">' + ac.cueName + '</span> [' + ac.timecodeStr + ']';
+                    currentCueEl.innerHTML = '🚨 ' + h(ac.progName) + ' — <span style="color:#9ca3af;">' + h(ac.cueName) + '</span> [' + h(ac.timecodeStr) + ']';
                 } else if (upcomingCueIdx >= 0 && nearestIdx >= 0) {
                     const nc = globalTriggers[nearestIdx];
                     const nDiff = nc.targetFrames - currentTotalFrames;
                     if (nDiff > -getRetentionFrames() && nDiff <= 0) {
-                        currentCueEl.innerHTML = '🚨 ' + nc.progName + ' — <span style="color:#9ca3af;">' + nc.cueName + '</span> [' + nc.timecodeStr + ']';
+                        currentCueEl.innerHTML = '🚨 ' + h(nc.progName) + ' — <span style="color:#9ca3af;">' + h(nc.cueName) + '</span> [' + h(nc.timecodeStr) + ']';
                     } else {
                         currentCueEl.innerHTML = '<span style="color:#64748b;">— 無觸發中 Cue</span>';
                     }
@@ -3966,7 +4717,7 @@ setTimeout(function() {
                 if (upcomingCueIdx >= 0) {
                     const uc = globalTriggers[upcomingCueIdx];
                     const uDiffSec = Math.ceil((uc.targetFrames - currentTotalFrames) / frameRate);
-                    nextCueEl.innerHTML = '➔ ' + uc.progName + ' — <span style="color:#9ca3af;">' + uc.cueName + '</span> [' + uc.timecodeStr + '] <span style="color:#64748b; font-weight:normal;">(' + uDiffSec + 's)</span>';
+                    nextCueEl.innerHTML = '➔ ' + h(uc.progName) + ' — <span style="color:#9ca3af;">' + h(uc.cueName) + '</span> [' + h(uc.timecodeStr) + '] <span style="color:#64748b; font-weight:normal;">(' + h(uDiffSec) + 's)</span>';
                 } else {
                     nextCueEl.innerHTML = '<span style="color:#64748b;">— 無後續 Cue</span>';
                 }
@@ -3975,6 +4726,8 @@ setTimeout(function() {
                 const cueCDLabel = document.getElementById('cueCountdownLabel');
                 const cueCDTimer = document.getElementById('cueCountdownTimer');
                 const cueCDMeta = document.getElementById('cueCountdownMeta');
+                var cueProgBarWrap = document.getElementById('cueProgressBarWrap');
+                var cueProgBarFill = document.getElementById('cueProgressBarFill');
                 if (cueCDLabel && cueCDTimer && cueCDMeta) {
                     if (upcomingCueIdx >= 0) {
                         const uc = globalTriggers[upcomingCueIdx];
@@ -3985,10 +4738,24 @@ setTimeout(function() {
                         cueCDLabel.innerText = uc.progName + ' — ' + uc.cueName;
                         cueCDTimer.innerText = String(mm).padStart(2,'0') + ':' + String(ss).padStart(2,'0');
                         cueCDMeta.innerText = '目標: ' + uc.timecodeStr + ' | 剩餘 ' + diffSec + ' 秒';
+                        // 進度條：假設節目長度為分母（若無節目則用 30min）
+                        if (cueProgBarWrap && cueProgBarFill) {
+                            var totalRef = 1800; // 30min 參考
+                            var onAir = activeList.find(function(p) {
+                                var sf = timecodeToTotalFrames(p.startTime), ef = sf + timecodeToTotalFrames(p.duration);
+                                return currentTotalFrames >= sf && currentTotalFrames <= ef;
+                            });
+                            if (onAir) totalRef = Math.ceil(timecodeToTotalFrames(onAir.duration) / frameRate);
+                            var pct = Math.max(0, Math.min(100, ((totalRef - diffSec) / totalRef) * 100));
+                            cueProgBarFill.style.width = pct + '%';
+                            cueProgBarFill.style.background = diffSec <= 30 ? 'var(--danger)' : 'var(--warning)';
+                            if (cueProgBarWrap) cueProgBarWrap.style.display = 'block';
+                        }
                     } else {
                         cueCDLabel.innerText = '—';
                         cueCDTimer.innerText = '--:--';
                         cueCDMeta.innerText = '尚無後續 Cue';
+                        if (cueProgBarWrap) cueProgBarWrap.style.display = 'none';
                     }
                 }
 
@@ -4118,23 +4885,121 @@ setTimeout(function() {
     // ===== 頁面內 Popup 提示（CUE 觸發時顯示） =====
     let cuePopupTimer = null;
 
+    // ===== Cue Alarm Bar（需操作員確認） =====
+    var _cueAlarmActive = false;
+    function showCueAlarm(progName, cueName) {
+        var bar = document.getElementById('cueAlarmBar');
+        var text = document.getElementById('cueAlarmText');
+        if (!bar || !text) return;
+        text.innerHTML = '🚨 CUE: ' + h(progName) + ' — ' + h(cueName);
+        bar.style.display = 'block';
+        _cueAlarmActive = true;
+        // 狀態列變紅
+        var statusBar = document.getElementById('statusBarLine');
+        if (statusBar) statusBar.style.background = '#ef4444';
+    }
+    function acknowledgeCueAlarm() {
+        var bar = document.getElementById('cueAlarmBar');
+        if (bar) bar.style.display = 'none';
+        _cueAlarmActive = false;
+        showToast("✅ Cue 已確認", "success");
+    }
+
+    // ===== 一鍵 Clipper 通知 =====
+    var _notifyProgName = '';
+    function showNotifyDialog() {
+        // 找當前播出節目
+        var now = getCalibratedDate();
+        var cf = timecodeToTotalFrames(dateToTimecode(now));
+        var activeList = getExpandedRundownForDate(document.getElementById('globalTargetDate').value);
+        var onAir = null;
+        activeList.forEach(function(p) {
+            var sf = timecodeToTotalFrames(p.startTime), ef = sf + timecodeToTotalFrames(p.duration);
+            if (cf >= sf && cf <= ef) onAir = p;
+        });
+        if (!onAir) { showToast("目前無播出中節目", "warn"); return; }
+        _notifyProgName = onAir.name;
+        var list = document.getElementById('notifyTemplateList');
+        if (!list) return;
+        var endTime = computeEndTime(onAir.startTime, onAir.duration).substring(0,5);
+        var templates = [
+            { label: '📡 ' + onAir.name + ' 已開播，預計 ' + endTime + ' 結束', msg: '📡 ' + onAir.name + ' 已開播，預計 ' + endTime + ' 結束。' },
+            { label: '⏱ 延後 2 分鐘 → ' + totalFramesToTimecode(timecodeToTotalFrames(onAir.startTime) + 120 * frameRate).substring(0,5) + ' 結束', msg: '⏱ ' + onAir.name + ' 延後 2 分鐘，預計 ' + totalFramesToTimecode(timecodeToTotalFrames(onAir.startTime) + 120 * frameRate).substring(0,5) + ' 結束。' },
+            { label: '⏱ 延後 5 分鐘 → ' + totalFramesToTimecode(timecodeToTotalFrames(onAir.startTime) + 300 * frameRate).substring(0,5) + ' 結束', msg: '⏱ ' + onAir.name + ' 延後 5 分鐘，預計 ' + totalFramesToTimecode(timecodeToTotalFrames(onAir.startTime) + 300 * frameRate).substring(0,5) + ' 結束。' },
+            { label: '✏️ 自訂訊息（下方輸入）', msg: '' }
+        ];
+        list.innerHTML = '';
+        templates.forEach(function(t, idx) {
+            var btn = document.createElement('button');
+            btn.className = 'clipper-peer-btn';
+            btn.style.cssText = 'display:block;width:100%;text-align:left;padding:8px 12px;font-size:12px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;cursor:pointer;';
+            btn.textContent = t.label;
+            btn.onclick = function() {
+                document.querySelectorAll('#notifyTemplateList button').forEach(function(b) { b.style.borderColor = '#334155'; b.style.background = '#1e293b'; });
+                btn.style.borderColor = '#38bdf8';
+                btn.style.background = '#1e3a5f';
+                var customArea = document.getElementById('notifyCustomMsg');
+                if (customArea) { customArea.value = t.msg; if (idx === 3) customArea.focus(); }
+            };
+            list.appendChild(btn);
+        });
+        document.getElementById('notifyModal').style.display = 'flex';
+        document.getElementById('notifyStatus').textContent = '';
+    }
+    function closeNotifyDialog() {
+        document.getElementById('notifyModal').style.display = 'none';
+    }
+    function sendNotifyMessage() {
+        var msg = document.getElementById('notifyCustomMsg').value.trim();
+        if (!msg) { showToast("請選擇模板或輸入訊息", "warn"); return; }
+        var statusEl = document.getElementById('notifyStatus');
+        statusEl.textContent = '⏳ 發送中...';
+        // 嘗試 Clipper 發送
+        var clipper = window.clipper || null;
+        if (clipper && clipper.connected) {
+            try {
+                clipper.sendChat(msg);
+                statusEl.textContent = '✅ 已透過 Clipper 發送';
+                showToast("✅ 通知已發送至 Clipper", "success");
+                closeNotifyDialog();
+                return;
+            } catch(e) {}
+        }
+        // Fallback: 複製到剪貼簿
+        try {
+            navigator.clipboard.writeText(msg).then(function() {
+                statusEl.textContent = '📋 已複製到剪貼簿（Clipper 未連線）';
+                showToast("📋 已複製到剪貼簿", "info");
+            }).catch(function() {
+                // 最後 fallback
+                var ta = document.createElement('textarea');
+                ta.value = msg; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+                statusEl.textContent = '📋 已複製到剪貼簿';
+                showToast("📋 已複製到剪貼簿", "info");
+            });
+        } catch(e) {
+            statusEl.textContent = '❌ 發送失敗';
+            showToast("❌ 通知發送失敗", "error");
+        }
+    }
+
     function sendCueNotification(progName, cueName) {
         let popup = document.getElementById('cuePopup');
         if (!popup) {
-            // 若 dom 尚未建立則動態建立
             popup = document.createElement('div');
             popup.id = 'cuePopup';
             popup.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;background:linear-gradient(135deg,#dc2626,#991b1b);color:#fff;padding:16px 28px;border-radius:10px;font-size:16px;font-weight:bold;box-shadow:0 8px 32px rgba(220,38,38,0.5);text-align:center;max-width:600px;width:90%;border:1px solid rgba(255,255,255,0.15);animation:cuePopIn 0.3s ease-out;font-family:"Microsoft JhengHei",sans-serif;';
             document.body.appendChild(popup);
         }
-        popup.innerHTML = '🚨 <span style="font-size:20px;">CUE 觸發！</span><br><span style="font-size:14px;opacity:0.9;">' + progName + ' — ' + cueName + '</span><br><span style="font-size:11px;opacity:0.6;display:block;margin-top:6px;">點擊關閉</span>';
+        popup.innerHTML = '🚨 <span style="font-size:20px;">CUE 觸發！</span><br><span style="font-size:14px;opacity:0.9;">' + h(progName) + ' — ' + h(cueName) + '</span><br><span style="font-size:11px;opacity:0.6;display:block;margin-top:6px;">點擊關閉</span>';
         popup.style.display = 'block';
         popup.onclick = function() { popup.style.display = 'none'; };
-        
         if (cuePopupTimer) clearTimeout(cuePopupTimer);
         cuePopupTimer = setTimeout(function() {
             if (popup) popup.style.display = 'none';
         }, 6000);
+        // 同時顯示持久性 Alarm Bar
+        showCueAlarm(progName, cueName);
     }
 
     function playBroadcastBeep(customFreq, presetObj) {
@@ -4265,16 +5130,29 @@ setTimeout(function() {
 
     // ===== 搜尋排程 =====
     function filterRundown() {
-        const query = document.getElementById('searchRundown').value.trim().toLowerCase();
-        const rows = document.querySelectorAll('#rundownTableBody tr');
-        rows.forEach(function(row) {
-            const nameCell = row.querySelector('td:first-child b');
-            if (!nameCell) { row.style.display = ''; return; }
-            const name = nameCell.textContent.toLowerCase();
-            row.style.display = (query === '' || name.indexOf(query) >= 0) ? '' : 'none';
-        });
+        var query = document.getElementById('searchRundown').value.trim().toLowerCase();
+        var rows = document.querySelectorAll('#rundownTableBody tr');
         var clearBtn = document.getElementById('searchClearBtn');
-        if (clearBtn) clearBtn.style.display = query ? 'inline' : 'none';
+        if (clearBtn) clearBtn.style.display = query ? 'inline-block' : 'none';
+        rows.forEach(function(row) {
+            var nameCell = row.querySelector('td:first-child b');
+            if (!nameCell) { row.style.display = ''; return; }
+            var name = nameCell.textContent.toLowerCase();
+            var match = query === '' || name.indexOf(query) >= 0;
+            row.style.display = match ? '' : 'none';
+            // Highlight matching text
+            if (match && query) {
+                var text = nameCell.textContent;
+                var idx = text.toLowerCase().indexOf(query);
+                if (idx >= 0) {
+                    nameCell.innerHTML = text.slice(0, idx) + '<mark style="background:#f59e0b;color:#090d16;padding:0 2px;border-radius:2px;">' + text.slice(idx, idx + query.length) + '</mark>' + text.slice(idx + query.length);
+                }
+            } else {
+                // Restore original text (unwrap any <mark>)
+                var txt = nameCell.textContent;
+                nameCell.innerHTML = txt;
+            }
+        });
     }
 
     // ===== 矩陣點擊排程編輯 =====
@@ -4744,6 +5622,24 @@ setTimeout(function() {
             });
         }
     });
+        // ─── i18n 語言切換 ───
+    function switchLanguage(locale) {
+        var I18n = County.get('I18n');
+        if (I18n) {
+            I18n.setLocale(locale);
+            // Update sidebar status labels that don't use data-i18n
+            var fpsLabel = document.getElementById('sidebarFpsLabel');
+            if (fpsLabel) fpsLabel.innerText = (window.frameRate || 25) + ' fps';
+            writeLog('🌐 Language switched to: ' + locale, 'info');
+        }
+    }
+
+    // Restore saved language after i18n modules are loaded
+    document.addEventListener('localechange', function(e) {
+        var sel = document.getElementById('cfgLanguage');
+        if (sel) sel.value = e.locale;
+    });
+
     function factoryResetStorage() { if (confirm("確定工廠重置？")) { localStorage.clear(); location.reload(); } }
 
     // County 模組初始化

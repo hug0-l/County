@@ -185,7 +185,8 @@ class ChatModule extends ClipperModule {
 
         input.value = '';
         const timestamp = Date.now();
-        const msgId = crypto.randomUUID().slice(0, 8);
+        var _uuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : null;
+        var msgId = _uuid ? _uuid.slice(0, 8) : 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
         const peerCount = APP.state.peers.size || 1;
         const replyTo = APP.state._pendingReply || null;
         const msg = { type: 'chat', msgId, text, from: APP.state.displayName, timestamp };

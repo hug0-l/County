@@ -1,5 +1,14 @@
 // county-api.js — API 客戶端模組
 County.register('API', function(C) {
+    // AbortSignal.timeout polyfill for older runtimes
+    if (!AbortSignal.timeout) {
+        AbortSignal.timeout = function(ms) {
+            var ctrl = new AbortController();
+            setTimeout(function() { ctrl.abort(); }, ms);
+            return ctrl.signal;
+        };
+    }
+
     var api = {};
 
     api._fetch = function(method, path, body) {
@@ -16,14 +25,16 @@ County.register('API', function(C) {
     };
 
     api.loadSchedules = function() { return api._fetch('GET', '/schedule'); };
-    api.saveSchedule = function(data) { return api._fetch('PUT', '/schedule/' + data.id, data); };
+    api.saveSchedule = function(data) { return api._fetch('POST', '/schedule', data); };
+    api.updateSchedule = function(id, data) { return api._fetch('PUT', '/schedule/' + id, data); };
     api.deleteSchedule = function(id) { return api._fetch('DELETE', '/schedule/' + id); };
-    api.loadPresets = function() { return api._fetch('GET', '/presets'); };
-    api.savePreset = function(data) { return api._fetch('PUT', '/preset/' + data.id, data); };
+    api.loadPresets = function() { return api._fetch('GET', '/preset'); };
+    api.savePreset = function(data) { return api._fetch('POST', '/preset', data); };
+    api.updatePreset = function(id, data) { return api._fetch('PUT', '/preset/' + id, data); };
     api.deletePreset = function(id) { return api._fetch('DELETE', '/preset/' + id); };
     api.ntpSync = function() { return api._fetch('POST', '/ntp/sync'); };
     api.loadConfig = function() { return api._fetch('GET', '/config'); };
-    api.saveConfig = function(data) { return api._fetch('POST', '/config', data); };
+    api.saveConfig = function(data) { return api._fetch('PUT', '/config', data); };
     api.restoreBackup = function(file) {
         var formData = new FormData();
         formData.append('file', file);
@@ -50,6 +61,7 @@ County.register('API', function(C) {
             presetId: s.preset_id || s.presetId || 'pre_broadcast',
             tags: s.tags || [],
             colorLabel: s.color_label || s.colorLabel || '',
+            exceptionDates: s.exception_dates || s.exceptionDates || [],
             _serverUpdatedAt: s.updated_at || '',
             _updatedAt: 0
         };
@@ -85,6 +97,7 @@ County.register('API', function(C) {
                         presetId: prog.presetId || 'pre_broadcast',
                         tags: prog.tags || [],
                         colorLabel: prog.colorLabel || '',
+                        exceptionDates: prog.exceptionDates || [],
                         updatedAt: prog._updatedAt ? new Date(prog._updatedAt).toISOString() : ''
                     };
                     await scheduleEndpointsAPI._fetch('PUT', '/schedule/' + payload.id, payload).catch(function(){});

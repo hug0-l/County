@@ -1,5 +1,24 @@
 # County — 更新日誌
 
+## v1.1 (2026-06-25)
+- **🌐 多國語言系統 (i18n)** — 新增完整 i18n 引擎，支援繁體中文與英文即時切換
+- **🔒 資安強化** — CSP Header、XSS 跳脫 (`h()`)、`_db_lock` 防寫競爭、上傳大小限制 10MB
+- **⚡ 效能改善** — resize 100ms debounce、`beforeunload` 清理 timer、`AbortSignal.timeout` polyfill
+- **🔧 相容性修復** — Python 3.6+ (`Union` 取代 `|`)、`crypto.randomUUID()` fallback、NTPException 提前 capture
+- **🔥 Toast 通知** — 全域操作回饋浮層（新增/編輯/刪除/引擎/NTP 同步）
+- **⌨️ 快捷鍵** — Escape 關閉 Modal、N 新增節目、F 焦點搜尋、Ctrl+S 儲存 Preset
+- **🔍 搜尋高亮** — 排程表搜尋關鍵字以 `<mark>` 高亮
+- **📦 備份工具列合併** — 移除排程頁重複備份欄
+- **📝 原始碼審計** — 33 項安全/效能/相容性問題已修復
+
+## v1.0 (2026-06-25)
+- **⏭️ 週期節目單日跳過** — 刪除週期性節目時可選擇「只跳過這一天」或「刪除全部」，支援特殊事件臨時調整
+- **📅 行事曆視覺標示** — 有跳過日期的節目在行事曆上以紅色底線 + ⏭️ 圖示標記
+- **🏷️ 跳過天數 Badge** — 排程表格中顯示 ⏭️跳過N天 標籤，懸浮提示顯示具體日期
+- **🧩 資料庫擴充** — `schedules` 表新增 `exception_dates` 欄位 (JSON 陣列字串)
+- **🔌 後端 API 更新** — exceptionDates 貫穿所有 CRUD 端點、備份/還原、自動同步
+- **🔧 伺服器埠號可設定** — 支援 `COUNTY_PORT` 環境變數，部署更靈活（`COUNTY_PORT=8001 python server.py`）
+
 ## v0.7 (2026-06-20)
 - **💬 Clipper IM 即時通訊分頁** — 側邊欄加入「💬 Clipper IM」分頁，WebSocket 即時聊天
 - **📦 ClipperSDK 整合** — 改用 `clipper-sdk.js` 對接完整 Clipper 協議，不再自製 WS 協議

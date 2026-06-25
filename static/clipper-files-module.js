@@ -145,7 +145,7 @@ class FilesModule extends ClipperModule {
         this.handleFileChunk(bytes.buffer, fromPid);
         const relayPeer2 = APP.state.peers.get(fromPid);
         if (relayPeer2) relayPeer2.relay = true;
-        window.updateTransportUI();
+        if (typeof window.updateTransportUI === 'function') window.updateTransportUI();
     }
 
     // ===== Utility =====
@@ -272,7 +272,7 @@ class FilesModule extends ClipperModule {
         for (const file of fileList) {
             APP.state.fileQueue.push({
                 file,
-                fileId: crypto.randomUUID(),
+                fileId: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'f_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
                 name: file.name,
                 size: file.size,
                 progress: 0,

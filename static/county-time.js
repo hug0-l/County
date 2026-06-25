@@ -84,7 +84,7 @@ County.register('Time', function(C) {
         lastSyncTime: null,
         errorMsg: '',
         config: {
-            ntpServerUrl: 'https://worldtimeapi.org/api/timezone/Asia/Hong_Kong',
+            ntpServerUrl: 'stdtime.gov.hk',
             ntpAutoSyncInterval: 0
         },
         timerId: null,

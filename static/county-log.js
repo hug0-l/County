@@ -37,15 +37,21 @@ County.register('Log', function(C) {
         var consoleEl = document.getElementById('consoleTerminal');
         var now = new Date();
         var timeStr = now.toTimeString().split(' ')[0] + '.' + String(now.getMilliseconds()).padStart(3, '0');
+        var scrollLockEl = document.getElementById('consoleScrollLock');
 
         if (consoleEl) {
+            var isAtBottom = consoleEl.scrollTop + consoleEl.clientHeight >= consoleEl.scrollHeight - 10;
             var line = document.createElement('div');
             line.className = 'console-line';
             if (type === 'error') line.style.color = '#ef4444';
             if (type === 'warn') line.style.color = '#f59e0b';
             line.innerHTML = '<span class="console-time">[' + timeStr + ']</span>' + message;
             consoleEl.appendChild(line);
-            consoleEl.scrollTop = consoleEl.scrollHeight;
+            if (isAtBottom) {
+                consoleEl.scrollTop = consoleEl.scrollHeight;
+            } else if (scrollLockEl) {
+                scrollLockEl.style.display = 'block';
+            }
         }
 
         if (type === 'error') console.error('[VCC]', message);

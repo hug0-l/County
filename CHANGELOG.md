@@ -1,5 +1,13 @@
 # County — 更新日誌
 
+## v1.0 (2026-06-25)
+- **⏭️ 週期節目單日跳過** — 刪除週期性節目時可選擇「只跳過這一天」或「刪除全部」，支援特殊事件臨時調整
+- **📅 行事曆視覺標示** — 有跳過日期的節目在行事曆上以紅色底線 + ⏭️ 圖示標記
+- **🏷️ 跳過天數 Badge** — 排程表格中顯示 ⏭️跳過N天 標籤，懸浮提示顯示具體日期
+- **🧩 資料庫擴充** — `schedules` 表新增 `exception_dates` 欄位 (JSON 陣列字串)
+- **🔌 後端 API 更新** — exceptionDates 貫穿所有 CRUD 端點、備份/還原、自動同步
+- **🔧 伺服器埠號可設定** — 支援 `COUNTY_PORT` 環境變數，部署更靈活（`COUNTY_PORT=8001 python server.py`）
+
 ## v0.9 (2026-06-20)
 - **📦 PyInstaller 打包** — 22MB macOS 執行檔；GitHub Actions 自動編譯 Windows `.exe` + macOS 執行檔
 - **🤖 CI/CD 自動化** — 推送 `v*` tag 觸發 GitHub Actions 建置流程，Windows + macOS 雙平台編譯，自動建立 Release

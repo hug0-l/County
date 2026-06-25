@@ -9,6 +9,8 @@
 ## 🏗️ 檔案結構
 ```
 county/
+├── README.md                        # 📖 專案架構文件 (26K)
+├── CHANGELOG.md                     # 📜 版本歷史 (v0.3 ~ v0.9)
 ├── server.py                        # 🚀 Python 後端 (FastAPI + SQLite + ntplib)
 ├── requirements.txt                 # Python 依賴
 ├── county.spec                      # PyInstaller 打包設定
@@ -36,7 +38,7 @@ county/
 │   ├── clipper-module-base.js       # 模組基底
 │   ├── clipper-chat-module.js       # 聊天模組
 │   ├── clipper-files-module.js      # 檔案傳輸模組
-│   └── CHANGELOG.md                 # 版本歷史
+│   └── CHANGELOG.md                 # 版本歷史 (static/)
 ├── tests/
 │   └── smoke_test.py                # 整合測試
 ├── backups/                         # 自動備份目錄
@@ -44,7 +46,7 @@ county/
 └── logs/                            # 伺服器日誌
 ```
 
-> 啟動方式：`pip install -r requirements.txt && python server.py`
+> 啟動方式：`pip install -r requirements.txt && python server.py`（預設埠號 8000，可用 `COUNTY_PORT=8001 python server.py` 自訂）
 
 ## 🧩 模組劃分（原始碼行號範圍）
 | 範圍 | 模組 | 說明 |
@@ -133,14 +135,16 @@ offset_ms = response.offset * 1000  # seconds → ms
 2. **NTP 使用 UDP port 123** — `ntplib` 透過 UDP 連接 `stdtime.gov.hk`。若防火牆阻擋 UDP 123，NTP 會降級至本地時鐘。
 3. **timeOffset 全局變數** — `let timeOffset = 0`。`getCalibratedDate()` 使用 `Date.now() + timeOffset` 做時間校正。
 4. **SQLite 資料庫 (`county.db`)** — 所有資料持久化在 SQLite。若資料庫損毀，可刪除後重啟伺服器（會重新建立空資料庫）。
-5. **重要 localStorage key**：
+5. **`exception_dates` 欄位** — `schedules` 表有 `exception_dates TEXT DEFAULT '[]'` 欄位（JSON 陣列）。前端 `isProgramActiveOnDate()` 會自動檢查跳過日期。資料透過 `api.normalizeScheduleFromApi()` 轉換為 `exceptionDates` 陣列。
+6. **PORT 環境變數** — 支援 `COUNTY_PORT` 環境變數自訂埠號（預設 8000），例如 `COUNTY_PORT=8001 python server.py`。
+7. **重要 localStorage key**：
    - `county_master_db_v8` — 排程資料庫（離線備援）
    - `county_presets_v8` — Cue Preset 庫（離線備援）
    - `county_config_v8` — 應用設定（離線備援）
    - `county_ntp_*` (x4) — NTP 時間服務暫存
-6. **時碼格式** — 固定 `HH:MM:SS:FF`（Frame 為單位，預設 PAL 25fps）
-7. **引擎 40ms timer** — `timerInterval = setInterval(updateGlobalDashboard, 40)`，只在首頁全量更新，其它頁面輕量 CUE 檢查。
-8. **AudioContext 需要用戶手勢** — 首次播放需要用戶點擊解鎖，聲音模組已內建 `actx.resume()` 處理。
+8. **時碼格式** — 固定 `HH:MM:SS:FF`（Frame 為單位，預設 PAL 25fps）
+9. **引擎 40ms timer** — `timerInterval = setInterval(updateGlobalDashboard, 40)`，只在首頁全量更新，其它頁面輕量 CUE 檢查。
+10. **AudioContext 需要用戶手勢** — 首次播放需要用戶點擊解鎖，聲音模組已內建 `actx.resume()` 處理。
 
 ## 🔧 開發流程提示
 - **修改 config 時**：記得同時更新 `saveConfig()` 和 `loadConfig()` 以及預設值 `defaultConfig()`
@@ -149,10 +153,11 @@ offset_ms = response.offset * 1000  # seconds → ms
 - **測試方式**：執行 `python server.py` 後開啟瀏覽器訪問 `http://localhost:8000`
 - **後端離線降級**：後端不可用時，前端自動使用 localStorage 資料，仍可瀏覽與編輯排程
 - **Agent 切記**：這是一個生產級系統，任何改動後都應該手動驗證所有核心功能！
+- **📝 雙語文件標準 (Bilingual Docs Standard)** — 從 v1.0 起所有專案文件（README、CHANGELOG、AGENTS.md、說明頁、更新日誌）必須以中英雙語撰寫。中文優先，附英文翻譯。新功能、API 變更、修改記錄均須中英對照，確保本地與國際團隊皆可閱讀。
 
 ## 📦 模組載入順序（由 `index.html` 的 `<script>` 標籤順序決定）
 
-所有 JavaScript 模組存放於 `static/` 目錄（共 22 個檔案）。載入順序如下：
+所有 JavaScript 模組存放於 `static/` 目錄（共 24 個檔案）。載入順序如下：
 
 | 順序 | 檔案 | 說明 |
 |------|------|------|
@@ -163,23 +168,26 @@ offset_ms = response.offset * 1000  # seconds → ms
 | 5 | `clipper-chat-module.js` | 聊天模組（編輯/刪除/回覆/Load More） |
 | 6 | `clipper-files-module.js` | 檔案傳輸模組（SHA-256/佇列/取消） |
 | 7 | `county-core.js` | **必須首位** — County 命名空間 + register() |
-| 8 | `county-helpers.js` | 全域工具函數 |
-| 9 | `county-config.js` | Config 管理 |
-| 10 | `county-api.js` | API 客戶端 |
-| 11 | `county-log.js` | 日誌系統 |
-| 12 | `county-time.js` | 時碼轉換 + NTP |
-| 13 | `county-data.js` | 資料層 |
-| 14 | `county-sound.js` | 音效系統 |
-| 15 | `county-engine.js` | CUE 引擎 |
-| 16 | `county-ui-live.js` | 首頁 UI |
-| 17 | `county-ui-rundown.js` | 排程頁 UI |
-| 18 | `county-ui-preset.js` | Preset 頁 UI |
-| 19 | `county-ui-settings.js` | 設定頁 UI |
-| 20 | `county-ui-clipper.js` | Clipper IM UI |
-| 21 | `index.html` 內嵌 `<script>` | 主要應用邏輯（最後載入） |
+| 8 | **`county-i18n.js`** | **i18n 引擎 — 多國語言、data-i18n DOM 繫結、內建繁體中文** |
+| 9 | **`county-i18n-en.js`** | **English locale — 英文語系翻譯檔** |
+| 10 | `county-helpers.js` | 全域工具函數 |
+| 11 | `county-config.js` | Config 管理 |
+| 12 | `county-api.js` | API 客戶端 |
+| 13 | `county-log.js` | 日誌系統 |
+| 14 | `county-time.js` | 時碼轉換 + NTP |
+| 15 | `county-data.js` | 資料層 |
+| 16 | `county-sound.js` | 音效系統 |
+| 17 | `county-engine.js` | CUE 引擎 |
+| 18 | `county-ui-live.js` | 首頁 UI |
+| 19 | `county-ui-rundown.js` | 排程頁 UI |
+| 20 | `county-ui-preset.js` | Preset 頁 UI |
+| 21 | `county-ui-settings.js` | 設定頁 UI |
+| 22 | `county-ui-clipper.js` | Clipper IM UI |
+| 23 | `index.html` 內嵌 `<script>` | 主要應用邏輯（最後載入） |
 
 **重要規則：**
 - `county-core.js` **必須**在 county 模組第一個被載入
+- `county-i18n.js` 和 `county-i18n-en.js` 必須在 `county-core.js` 之後、其他 county 模組之前載入（英文語系註冊在 `I18n` 引擎之前完成）
 - `clipper-message-bus.js` 需在 `clipper-ws-manager.js` 之前
 - `clipper-module-base.js` 需在 `clipper-chat-module.js` / `clipper-files-module.js` 之前
 - 載入順序錯誤會導致 ReferenceError 或 TypeError
@@ -192,6 +200,8 @@ offset_ms = response.offset * 1000  # seconds → ms
 |------|------|------|
 | `county.css` | CSS | 樣式表 |
 | `county-core.js` | JS | 模組載入器 + `County` 命名空間 |
+| `county-i18n.js` | JS | i18n 引擎（多國語言、data-i18n DOM繫結、內建 zh 語系） |
+| `county-i18n-en.js` | JS | English locale（英文語系翻譯） |
 | `county-helpers.js` | JS | 共用工具函數 |
 | `county-config.js` | JS | Config 管理（saveConfig, loadConfig, 匯出入） |
 | `county-api.js` | JS | API 客戶端（FastAPI 後端通訊） |
@@ -241,6 +251,8 @@ python3 tests/smoke_test.py
 - [ ] Clipper 聊天收發正常
 - [ ] Clipper 檔案傳輸（先選對象 → 拖放 → 進度條 → 自動下載）
 - [ ] Clipper 檔案接收進度條正常更新
+- [ ] 🌐 語言切換（設定頁 → Language 下拉 → English → 側欄立即顯示英文）
+- [ ] 📝 文件雙語檢查（所有新增/修改的文件皆有中英雙語版本）
 
 ## 📝 版本控制
 - Branch: `main`（正式版）

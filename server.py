@@ -14,9 +14,9 @@ import time
 import webbrowser
 from datetime import date, datetime, timezone, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
-from fastapi import FastAPI, Request, UploadFile, Query
+from fastapi import FastAPI, Request, UploadFile, Query, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, PlainTextResponse
@@ -97,6 +97,7 @@ _clean_old_logs()
 # ---------------------------------------------------------------------------
 
 DB_PATH = BASE_DIR / "county.db"
+_db_lock = threading.Lock()  # serialise write access to prevent race conditions
 
 
 def get_db() -> sqlite3.Connection:
@@ -151,6 +152,12 @@ def init_db():
         conn.commit()
     except Exception:
         pass  # column already exists
+    # Migration: add exception_dates column for existing databases
+    try:
+        conn.execute("ALTER TABLE schedules ADD COLUMN exception_dates TEXT DEFAULT '[]'")
+        conn.commit()
+    except Exception:
+        pass  # column already exists
     conn.close()
 
 
@@ -172,12 +179,13 @@ def db_get_schedules() -> list:
         d = dict(row)
         d['tags'] = json.loads(d.get('tags', '[]'))
         d['periodicDays'] = json.loads(d.get('periodic_days', '[]'))
+        d['exceptionDates'] = json.loads(d.get('exception_dates', '[]'))
         result.append(d)
     conn.close()
     return result
 
 
-def db_get_schedule(id: str) -> dict | None:
+def db_get_schedule(id: str) -> Union[dict, None]:
     conn = get_db()
     row = conn.execute('SELECT * FROM schedules WHERE id=?', (id,)).fetchone()
     conn.close()
@@ -185,35 +193,41 @@ def db_get_schedule(id: str) -> dict | None:
         d = dict(row)
         d['tags'] = json.loads(d.get('tags', '[]'))
         d['periodicDays'] = json.loads(d.get('periodic_days', '[]'))
+        d['exceptionDates'] = json.loads(d.get('exception_dates', '[]'))
         return d
     return None
 
 
 def db_upsert_schedule(data: dict) -> dict:
-    conn = get_db()
-    now = datetime.now(timezone.utc).isoformat()
-    tags_json = json.dumps(data.get('tags', []), ensure_ascii=False)
-    days_json = json.dumps(data.get('periodicDays', []))
-    conn.execute('''INSERT OR REPLACE INTO schedules 
-        (id, name, broadcast_date, start_time, duration, periodic_type, 
-         periodic_end_date, periodic_days, preset_id, tags, color_label, updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
-        (data['id'], data['name'], data.get('broadcastDate', ''),
-         data.get('startTime', ''), data.get('duration', ''),
-         data.get('periodicType', 'none'), data.get('periodicEndDate', ''),
-         days_json, data.get('presetId', 'pre_broadcast'),
-         tags_json, data.get('colorLabel', ''), now))
-    conn.commit()
-    conn.close()
+    with _db_lock:
+        conn = get_db()
+        now = datetime.now(timezone.utc).isoformat()
+        tags_json = json.dumps(data.get('tags', []), ensure_ascii=False)
+        days_json = json.dumps(data.get('periodicDays', []))
+        exceptions_json = json.dumps(data.get('exceptionDates', []))
+        conn.execute('''INSERT OR REPLACE INTO schedules 
+            (id, name, broadcast_date, start_time, duration, periodic_type, 
+             periodic_end_date, periodic_days, preset_id, tags, color_label, updated_at,
+             exception_dates)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+            (data['id'], data['name'], data.get('broadcastDate', ''),
+             data.get('startTime', ''), data.get('duration', ''),
+             data.get('periodicType', 'none'), data.get('periodicEndDate', ''),
+             days_json, data.get('presetId', 'pre_broadcast'),
+             tags_json, data.get('colorLabel', ''), now,
+             exceptions_json))
+        conn.commit()
+        conn.close()
     return db_get_schedule(data['id'])
 
 
 def db_delete_schedule(id: str) -> bool:
-    conn = get_db()
-    conn.execute('DELETE FROM schedules WHERE id=?', (id,))
-    affected = conn.total_changes
-    conn.commit()
-    conn.close()
+    with _db_lock:
+        conn = get_db()
+        conn.execute('DELETE FROM schedules WHERE id=?', (id,))
+        affected = conn.total_changes
+        conn.commit()
+        conn.close()
     return affected > 0
 
 
@@ -227,7 +241,7 @@ def db_get_presets() -> list:
     return result
 
 
-def db_get_preset(id: str) -> dict | None:
+def db_get_preset(id: str) -> Union[dict, None]:
     conn = get_db()
     row = conn.execute('SELECT * FROM presets WHERE id=?', (id,)).fetchone()
     conn.close()
@@ -239,34 +253,37 @@ def db_get_preset(id: str) -> dict | None:
 
 
 def db_upsert_preset(data: dict) -> dict:
-    conn = get_db()
-    nodes_json = json.dumps(data.get('nodes', []), ensure_ascii=False)
-    conn.execute('''INSERT OR REPLACE INTO presets (id, name, nodes_json)
-        VALUES (?,?,?)''', (data['id'], data['name'], nodes_json))
-    conn.commit()
-    conn.close()
+    with _db_lock:
+        conn = get_db()
+        nodes_json = json.dumps(data.get('nodes', []), ensure_ascii=False)
+        conn.execute('''INSERT OR REPLACE INTO presets (id, name, nodes_json)
+            VALUES (?,?,?)''', (data['id'], data['name'], nodes_json))
+        conn.commit()
+        conn.close()
     return db_get_preset(data['id'])
 
 
 def db_delete_preset(id: str) -> bool:
-    conn = get_db()
-    conn.execute('DELETE FROM presets WHERE id=?', (id,))
-    affected = conn.total_changes
-    conn.commit()
-    conn.close()
+    with _db_lock:
+        conn = get_db()
+        conn.execute('DELETE FROM presets WHERE id=?', (id,))
+        affected = conn.total_changes
+        conn.commit()
+        conn.close()
     return affected > 0
 
 
 def db_import_legacy(schedules: list, presets: dict):
     """Import from legacy localStorage dump."""
-    for pid, pdata in presets.items():
-        db_upsert_preset({
-            'id': pid,
-            'name': pdata.get('name', ''),
-            'nodes': pdata.get('nodes', [])
-        })
-    for s in schedules:
-        db_upsert_schedule(s)
+    with _db_lock:
+        for pid, pdata in presets.items():
+            db_upsert_preset({
+                'id': pid,
+                'name': pdata.get('name', ''),
+                'nodes': pdata.get('nodes', [])
+            })
+        for s in schedules:
+            db_upsert_schedule(s)
 
 
 # ---------------------------------------------------------------------------
@@ -283,25 +300,28 @@ def db_get_all_config() -> dict:
 
 
 def db_set_config(key: str, value: str):
-    conn = get_db()
-    conn.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?,?)', (key, str(value)))
-    conn.commit()
-    conn.close()
+    with _db_lock:
+        conn = get_db()
+        conn.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?,?)', (key, str(value)))
+        conn.commit()
+        conn.close()
 
 
 def db_set_config_many(pairs: dict):
-    conn = get_db()
-    for key, value in pairs.items():
-        conn.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?,?)', (key, str(value)))
-    conn.commit()
-    conn.close()
+    with _db_lock:
+        conn = get_db()
+        for key, value in pairs.items():
+            conn.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?,?)', (key, str(value)))
+        conn.commit()
+        conn.close()
 
 
 def db_clear_config():
-    conn = get_db()
-    conn.execute('DELETE FROM config')
-    conn.commit()
-    conn.close()
+    with _db_lock:
+        conn = get_db()
+        conn.execute('DELETE FROM config')
+        conn.commit()
+        conn.close()
 
 
 def db_get_ntp_logs(limit=50):
@@ -319,6 +339,7 @@ def db_get_ntp_logs(limit=50):
 
 class NTPManager:
     def __init__(self):
+        self._lock = threading.Lock()
         self.status = 'local'  # 'connected' | 'fallback' | 'local' | 'syncing' | 'error'
         self.offset_ms = 0.0
         self.last_sync_time = None
@@ -327,35 +348,43 @@ class NTPManager:
 
     def sync(self) -> dict:
         """Sync with NTP server using ntplib (UDP 123). Returns status dict."""
-        self.status = 'syncing'
+        with self._lock:
+            self.status = 'syncing'
         try:
             import ntplib
+            ntp_exc = ntplib.NTPException
             client = ntplib.NTPClient()
             response = client.request(self.server_url, version=4, timeout=5)
-            self.offset_ms = response.offset * 1000  # seconds → ms
-            self.last_sync_time = datetime.now(timezone.utc).isoformat()
-            self.status = 'connected'
-            self.error_msg = ''
+            with self._lock:
+                self.offset_ms = response.offset * 1000  # seconds → ms
+                self.last_sync_time = datetime.now(timezone.utc).isoformat()
+                self.status = 'connected'
+                self.error_msg = ''
             self._log_sync()
         except ImportError:
-            self.error_msg = 'ntplib not installed'
-            self.status = 'error' if self.offset_ms == 0 else 'fallback'
-        except ntplib.NTPException as e:
-            self.error_msg = str(e)
-            self.status = 'fallback' if self.offset_ms != 0 else 'error'
+            with self._lock:
+                self.error_msg = 'ntplib not installed'
+                self.status = 'error' if self.offset_ms == 0 else 'fallback'
+            return self.get_status()
+        except ntp_exc as e:
+            with self._lock:
+                self.error_msg = str(e)
+                self.status = 'fallback' if self.offset_ms != 0 else 'error'
         except Exception as e:
-            self.error_msg = str(e)
-            self.status = 'fallback' if self.offset_ms != 0 else 'error'
+            with self._lock:
+                self.error_msg = str(e)
+                self.status = 'fallback' if self.offset_ms != 0 else 'error'
         return self.get_status()
 
     def get_status(self) -> dict:
-        return {
-            'status': self.status,
-            'offset_ms': round(self.offset_ms, 2),
-            'server': self.server_url,
-            'last_sync': self.last_sync_time or '',
-            'error_msg': self.error_msg
-        }
+        with self._lock:
+            return {
+                'status': self.status,
+                'offset_ms': round(self.offset_ms, 2),
+                'server': self.server_url,
+                'last_sync': self.last_sync_time or '',
+                'error_msg': self.error_msg
+            }
 
     def _log_sync(self):
         try:
@@ -384,11 +413,11 @@ ntp_manager = NTPManager()
 
 app = FastAPI(title="County Backend", version="0.1")
 
-# CORS — allow all origins
+# CORS — allow all origins (no credentials to stay spec-compliant)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -418,6 +447,7 @@ class ScheduleCreate(BaseModel):
     tags: list = []
     colorLabel: str = ''
     updatedAt: str = ''
+    exceptionDates: list = []
 
 
 class PresetCreate(BaseModel):
@@ -467,14 +497,14 @@ def _ntp_auto_sync_loop():
 # ---------------------------------------------------------------------------
 
 
-def _validate_timecode(tc: str) -> bool:
-    """Validate timecode format HH:MM:SS:FF. Hours 0-23, frames 0-24 (PAL 25fps)."""
+def _validate_timecode(tc: str, frame_rate: int = 25) -> bool:
+    """Validate timecode format HH:MM:SS:FF. Hours 0-23, max frame = frame_rate-1."""
     import re
     if not re.match(r'^\d{2}:\d{2}:\d{2}:\d{2}$', tc):
         return False
     parts = tc.split(':')
     h, m, s, f = int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3])
-    return 0 <= h <= 23 and 0 <= m <= 59 and 0 <= s <= 59 and 0 <= f <= 24
+    return 0 <= h <= 23 and 0 <= m <= 59 and 0 <= s <= 59 and 0 <= f < frame_rate
 
 def _tc_to_seconds(tc: str) -> float:
     """Convert HH:MM:SS:FF to total seconds (approximate, 25fps)."""
@@ -493,6 +523,7 @@ def _normalize_schedule_keys(d: dict) -> dict:
         'periodicDays': 'periodic_days',
         'presetId': 'preset_id',
         'colorLabel': 'color_label',
+        'updatedAt': 'updated_at',
     }
     result = dict(d)
     for camel, snake in mapping.items():
@@ -589,7 +620,8 @@ async def index():
     content = INDEX_HTML.read_bytes()
     return Response(content=content, media_type="text/html",
                     headers={"Cache-Control": "no-cache, no-store, must-revalidate",
-                             "Pragma": "no-cache", "Expires": "0"})
+                             "Pragma": "no-cache", "Expires": "0",
+                             "Content-Security-Policy": "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ws: wss:; img-src 'self' data:; font-src 'self' data:"})
 
 
 @app.get("/api/ntp/status")
@@ -615,9 +647,10 @@ async def validate_schedule(data: dict):
     # Timecode format check
     start_time = data.get('startTime', '')
     duration = data.get('duration', '')
-    if not _validate_timecode(start_time):
+    frame_rate = int(data.get('frameRate', 25))
+    if not _validate_timecode(start_time, frame_rate):
         errors.append(f"無效的開始時間格式: {start_time}")
-    if not _validate_timecode(duration):
+    if not _validate_timecode(duration, frame_rate):
         errors.append(f"無效的長度格式: {duration}")
     elif _tc_to_seconds(duration) <= 0:
         errors.append("長度必須大於 0")
@@ -732,9 +765,13 @@ def download_backup():
     )
 
 
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
+
 @app.post('/api/backup/restore')
 async def restore_backup(file: UploadFile):
     content = await file.read()
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="File too large (max 10MB)")
     data = json.loads(content)
     # Clear existing
     conn = get_db()
@@ -925,7 +962,8 @@ async def download_log_file():
 # ---------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    log_info(f"🚀 Server running at http://localhost:8000")
+    port = int(os.environ.get('COUNTY_PORT', '8000'))
+    log_info(f"🚀 Server running at http://localhost:{port}")
     init_db()
-    threading.Timer(1.5, lambda: webbrowser.open('http://localhost:8000')).start()
-    uvicorn.run(app, host='0.0.0.0', port=8000)
+    threading.Timer(1.5, lambda: webbrowser.open(f'http://localhost:{port}')).start()
+    uvicorn.run(app, host='0.0.0.0', port=port)
