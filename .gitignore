@@ -39,3 +39,6 @@ Thumbs.db
 backups/
 build/
 dist/
+
+# Working documents
+proposal_*.md
